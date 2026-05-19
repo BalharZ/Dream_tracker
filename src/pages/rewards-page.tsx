@@ -418,7 +418,7 @@ export default function RewardsPage() {
           </p>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           <BrowseRewardsDialog />
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>

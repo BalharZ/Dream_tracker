@@ -84,7 +84,7 @@ export default function MainLayout({
           <Button
             variant="ghost"
             size="icon"
-            className="md:hidden absolute top-4 left-4"
+            className="md:hidden fixed top-3 left-3 z-50 bg-background/80 backdrop-blur-sm shadow-sm border"
           >
             <Menu className="h-6 w-6" />
           </Button>
@@ -129,7 +129,7 @@ export default function MainLayout({
 
       {/* Main Content */}
       <main className="flex-1 min-h-screen">
-        <div className="container mx-auto p-6">{children}</div>
+        <div className="container mx-auto p-6 pt-16 md:pt-6">{children}</div>
       </main>
     </div>
   );

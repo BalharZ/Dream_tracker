@@ -11,14 +11,7 @@ import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { ChevronRight } from "lucide-react";
 import { format } from "date-fns";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+// Table imports removed - using custom div-based grid for sticky columns
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -215,37 +208,31 @@ function HabitsPage() {
             <h2 className="text-lg font-semibold">History</h2>
           </div>
 
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Habit</TableHead>
-                  <TableHead>Target</TableHead>
-                  {daysToShow.map((date, i) => (
-                    <TableHead key={i} className="text-center w-16">
-                      {format(date, "d.M")}
-                    </TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+          <div className="relative">
+            {/* Grid with sticky left columns */}
+            <div className="flex">
+              {/* Sticky left: Habit + Target columns */}
+              <div className="flex-shrink-0 z-10 bg-card">
+                {/* Header row */}
+                <div className="flex border-b">
+                  <div className="w-36 sm:w-48 px-3 py-3 text-sm font-medium text-muted-foreground">Habit</div>
+                  <div className="w-16 sm:w-20 px-2 py-3 text-sm font-medium text-muted-foreground">Target</div>
+                </div>
+                {/* Data rows */}
                 {habits?.filter(habit => {
                   if (!habit.goal_id) return true;
                   const goalExists = goals?.some(goal => goal.id === habit.goal_id);
                   return goalExists;
                 }).map((habit) => (
-                  <TableRow
+                  <div
                     key={habit.id}
-                    className={cn(
-                      habit.current_value >= habit.target_value && "bg-green-100",
-                      "transition-all duration-500 hover:bg-opacity-10"
-                    )}
+                    className="flex border-b"
                     style={{
                       backgroundColor: `${habit.color}10`,
                       borderLeft: `4px solid ${habit.color}`
                     }}
                   >
-                    <TableCell className="font-medium" style={{ color: habit.color }}>
+                    <div className="w-36 sm:w-48 px-3 py-3">
                       <Button
                         variant="link"
                         className="h-auto p-0 text-left"
@@ -255,32 +242,59 @@ function HabitsPage() {
                           setHabitToEdit(habit);
                         }}
                       >
-                        <div className="font-bold">{habit.name}</div>
-                        <div className="text-sm text-muted-foreground">
+                        <div className="font-bold text-sm leading-tight">{habit.name}</div>
+                        <div className="text-xs text-muted-foreground leading-tight">
                           {habit.goal_id
                             ? goals?.find((g) => g.id === habit.goal_id)?.name
-                            : "Habit without goal"}
+                            : "No goal"}
                         </div>
                       </Button>
-                    </TableCell>
-                    <TableCell style={{ color: habit.color }}>
-                      <span className="text-lg font-bold">{habit.target_value}</span> {habit.unit}
-                    </TableCell>
+                    </div>
+                    <div className="w-16 sm:w-20 px-2 py-3 flex items-center" style={{ color: habit.color }}>
+                      <span className="text-base font-bold">{habit.target_value}</span>
+                      <span className="text-xs ml-0.5">{habit.unit}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Scrollable right: Date columns */}
+              <div className="flex-1 overflow-x-auto">
+                {/* Header row */}
+                <div className="flex border-b">
+                  {daysToShow.map((date, i) => (
+                    <div key={i} className="w-14 sm:w-16 flex-shrink-0 px-1 py-3 text-center text-sm font-medium text-muted-foreground">
+                      {format(date, "d.M")}
+                    </div>
+                  ))}
+                </div>
+                {/* Data rows */}
+                {habits?.filter(habit => {
+                  if (!habit.goal_id) return true;
+                  const goalExists = goals?.some(goal => goal.id === habit.goal_id);
+                  return goalExists;
+                }).map((habit) => (
+                  <div
+                    key={habit.id}
+                    className="flex border-b"
+                    style={{ backgroundColor: `${habit.color}10` }}
+                  >
                     {daysToShow.map((date, i) => {
                       const dateStr = format(date, "yyyy-MM-dd");
                       const value = progressMap[habit.id]?.[dateStr] || 0;
                       const isTargetMet = value >= habit.target_value;
 
                       return (
-                        <TableCell key={i} className="p-2">
-                          <div
-                            className="flex flex-col items-center cursor-pointer transition-all hover:scale-110"
-                            onClick={() => {
-                              setSelectedHabit(habit);
-                              setSelectedDate(date);
-                              setEditProgressDialogOpen(true);
-                            }}
-                          >
+                        <div
+                          key={i}
+                          className="w-14 sm:w-16 flex-shrink-0 px-1 py-2 cursor-pointer transition-all hover:scale-110"
+                          onClick={() => {
+                            setSelectedHabit(habit);
+                            setSelectedDate(date);
+                            setEditProgressDialogOpen(true);
+                          }}
+                        >
+                          <div className="flex flex-col items-center">
                             <div
                               className="text-base font-medium"
                               style={{
@@ -297,13 +311,13 @@ function HabitsPage() {
                               {habit.unit}
                             </div>
                           </div>
-                        </TableCell>
+                        </div>
                       );
                     })}
-                  </TableRow>
+                  </div>
                 ))}
-              </TableBody>
-            </Table>
+              </div>
+            </div>
           </div>
 
           <div className="flex justify-end mt-4">
