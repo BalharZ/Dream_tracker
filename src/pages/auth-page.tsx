@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
 import { useLocation } from "wouter";
 import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -89,16 +88,11 @@ function AuthTabs() {
   );
 }
 
-const authSchema = z.object({
-  username: z.string().min(1, "Username is required"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
-});
-
 function LoginForm() {
   const { loginMutation } = useAuth();
   const form = useForm({
     defaultValues: {
-      username: "",
+      email: "",
       password: "",
     },
   });
@@ -109,11 +103,12 @@ function LoginForm() {
       className="space-y-4 mt-4"
     >
       <div className="space-y-2">
-        <Label htmlFor="username">Username</Label>
+        <Label htmlFor="email">Email</Label>
         <Input
-          id="username"
-          {...form.register("username")}
-          placeholder="Enter your username"
+          id="email"
+          type="email"
+          {...form.register("email")}
+          placeholder="Enter your email"
         />
       </div>
 
@@ -145,7 +140,7 @@ function RegisterForm() {
   const { registerMutation } = useAuth();
   const form = useForm({
     defaultValues: {
-      username: "",
+      email: "",
       password: "",
     },
   });
@@ -156,11 +151,12 @@ function RegisterForm() {
       className="space-y-4 mt-4"
     >
       <div className="space-y-2">
-        <Label htmlFor="reg-username">Username</Label>
+        <Label htmlFor="reg-email">Email</Label>
         <Input
-          id="reg-username"
-          {...form.register("username")}
-          placeholder="Choose a username"
+          id="reg-email"
+          type="email"
+          {...form.register("email")}
+          placeholder="Enter your email"
         />
       </div>
 
@@ -170,7 +166,7 @@ function RegisterForm() {
           id="reg-password"
           type="password"
           {...form.register("password")}
-          placeholder="Choose a password"
+          placeholder="Choose a password (min 6 characters)"
         />
       </div>
 

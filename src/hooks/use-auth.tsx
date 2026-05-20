@@ -6,7 +6,8 @@ import type { User } from "@supabase/supabase-js";
 
 type AuthUser = {
   id: string;
-  username: string;
+  email: string;
+  displayName: string;
 };
 
 type AuthContextType = {
@@ -18,16 +19,19 @@ type AuthContextType = {
   registerMutation: UseMutationResult<AuthUser, Error, RegisterData>;
 };
 
-type LoginData = { username: string; password: string };
-type RegisterData = { username: string; password: string };
+type LoginData = { email: string; password: string };
+type RegisterData = { email: string; password: string };
 
 function toAuthUser(user: User): AuthUser {
   const email = user.email ?? user.id;
+  // Extract display name: part before @ or full email
+  const displayName = email.includes("@")
+    ? email.split("@")[0]
+    : email;
   return {
     id: user.id,
-    username: email.endsWith("@dreamtracker.app")
-      ? email.replace("@dreamtracker.app", "")
-      : email,
+    email,
+    displayName,
   };
 }
 
@@ -58,9 +62,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
-      const email = credentials.username.includes("@")
-        ? credentials.username
-        : `${credentials.username}@dreamtracker.app`;
+      // Support old username-based accounts (e.g. "demo" → "demo@dreamtracker.app")
+      const email = credentials.email.includes("@")
+        ? credentials.email
+        : `${credentials.email}@dreamtracker.app`;
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password: credentials.password,
@@ -76,11 +81,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const registerMutation = useMutation({
     mutationFn: async (credentials: RegisterData) => {
-      const email = credentials.username.includes("@")
-        ? credentials.username
-        : `${credentials.username}@dreamtracker.app`;
+      if (!credentials.email.includes("@")) {
+        throw new Error("Please enter a valid email address");
+      }
       const { data, error } = await supabase.auth.signUp({
-        email,
+        email: credentials.email,
         password: credentials.password,
       });
       if (error) throw new Error(error.message);

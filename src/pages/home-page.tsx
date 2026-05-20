@@ -32,7 +32,7 @@ export default function HomePage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold mb-2">Welcome, {user?.username}!</h1>
+        <h1 className="text-3xl font-bold mb-2">Welcome, {user?.displayName}!</h1>
         <p className="text-muted-foreground">
           Track your progress and achieve your dreams
         </p>
