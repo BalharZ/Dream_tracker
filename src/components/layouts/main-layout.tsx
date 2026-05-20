@@ -89,14 +89,14 @@ export default function MainLayout({
             <Menu className="h-6 w-6" />
           </Button>
         </SheetTrigger>
-        <SheetContent side="left" className="p-0">
+        <SheetContent side="left" className="p-0 flex flex-col h-full">
           <div className="p-6">
             <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
               Dream Tracker
             </h1>
           </div>
 
-          <nav className="flex-1 px-4 space-y-2">
+          <nav className="px-4 space-y-2">
             {navigation.map((item) => (
               <Link key={item.href} href={item.href}>
                 <Button
@@ -113,7 +113,7 @@ export default function MainLayout({
             ))}
           </nav>
 
-          <div className="p-4 border-t">
+          <div className="mt-auto p-4 border-t">
             <Button
               variant="ghost"
               className="w-full justify-start"
@@ -128,7 +128,7 @@ export default function MainLayout({
       </Sheet>
 
       {/* Main Content */}
-      <main className="flex-1 min-h-screen">
+      <main className="flex-1 min-h-screen min-w-0 overflow-x-hidden">
         <div className="container mx-auto p-6 pt-16 md:pt-6">{children}</div>
       </main>
     </div>

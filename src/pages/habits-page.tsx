@@ -185,7 +185,7 @@ function HabitsPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 overflow-x-hidden">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold mb-2">Habits</h1>
@@ -205,21 +205,21 @@ function HabitsPage() {
         />
       </div>
 
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between mb-6">
+      <Card className="overflow-hidden">
+        <CardContent className="p-0 sm:p-6">
+          <div className="flex items-center justify-between mb-4 px-4 pt-4 sm:px-0 sm:pt-0">
             <h2 className="text-lg font-semibold">History</h2>
           </div>
 
           <div className="relative">
             {/* Grid with sticky left columns */}
-            <div className="flex">
+            <div className="flex overflow-x-auto">
               {/* Sticky left: Habit + Target columns */}
-              <div className="flex-shrink-0 z-10 bg-card">
+              <div className="flex-shrink-0 sticky left-0 z-10 bg-card border-r">
                 {/* Header row */}
                 <div className="flex border-b">
-                  <div className="w-36 sm:w-48 px-3 py-3 text-sm font-medium text-muted-foreground">Habit</div>
-                  <div className="w-16 sm:w-20 px-2 py-3 text-sm font-medium text-muted-foreground">Target</div>
+                  <div className="w-28 sm:w-48 px-3 py-3 text-sm font-medium text-muted-foreground">Habit</div>
+                  <div className="w-14 sm:w-20 px-2 py-3 text-sm font-medium text-muted-foreground text-center">Target</div>
                 </div>
                 {/* Data rows */}
                 {habits?.filter(habit => {
@@ -235,7 +235,7 @@ function HabitsPage() {
                       borderLeft: `4px solid ${habit.color}`
                     }}
                   >
-                    <div className="w-36 sm:w-48 px-3 py-3">
+                    <div className="w-28 sm:w-48 px-3 py-3">
                       <Button
                         variant="link"
                         className="h-auto p-0 text-left"
@@ -245,24 +245,19 @@ function HabitsPage() {
                           setHabitToEdit(habit);
                         }}
                       >
-                        <div className="font-bold text-sm leading-tight">{habit.name}</div>
-                        <div className="text-xs text-muted-foreground leading-tight">
-                          {habit.goal_id
-                            ? goals?.find((g) => g.id === habit.goal_id)?.name
-                            : "No goal"}
-                        </div>
+                        <div className="font-bold text-sm leading-tight truncate">{habit.name}</div>
                       </Button>
                     </div>
-                    <div className="w-16 sm:w-20 px-2 py-3 flex items-center" style={{ color: habit.color }}>
-                      <span className="text-base font-bold">{habit.target_value}</span>
-                      <span className="text-xs ml-0.5">{habit.unit}</span>
+                    <div className="w-14 sm:w-20 px-2 py-3 flex flex-col items-center justify-center" style={{ color: habit.color }}>
+                      <span className="text-base font-bold leading-tight">{habit.target_value}</span>
+                      <span className="text-[10px] leading-tight">{habit.unit}</span>
                     </div>
                   </div>
                 ))}
               </div>
 
               {/* Scrollable right: Date columns */}
-              <div className="flex-1 overflow-x-auto">
+              <div className="flex-shrink-0">
                 {/* Header row */}
                 <div className="flex border-b">
                   {daysToShow.map((date, i) => (
@@ -323,7 +318,7 @@ function HabitsPage() {
             </div>
           </div>
 
-          <div className="flex justify-end mt-4">
+          <div className="flex justify-end mt-4 px-4 pb-4 sm:px-0 sm:pb-0">
             <Button
               variant="outline"
               onClick={() => setNumberOfDays(prev => prev + 30)}
