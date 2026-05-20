@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -519,7 +519,7 @@ function RewardRoulette({
   const [isAnimating, setIsAnimating] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
   const [rewardCards, setRewardCards] = useState<Reward[]>([]);
-  const [rewardClaimed, setRewardClaimed] = useState(false);
+  const rewardClaimedRef = useRef(false);
 
   const fixedWinningIndex = 50;
 
@@ -527,7 +527,7 @@ function RewardRoulette({
     if (show) {
       setIsAnimating(true);
       setIsFinished(false);
-      setRewardClaimed(false);
+      rewardClaimedRef.current = false;
       setAnimationPhase('initial');
 
       const emptySlot = {
@@ -610,6 +610,21 @@ function RewardRoulette({
           setAnimationPhase('finished');
           setIsFinished(true);
           setIsAnimating(false);
+
+          if (!rewardClaimedRef.current && chosenReward.id > 0) {
+            rewardClaimedRef.current = true;
+            supabase
+              .from("rewards")
+              .update({ available: chosenReward.available + 1 })
+              .eq("id", chosenReward.id)
+              .then(({ error }) => {
+                if (error) {
+                  console.error('Error claiming reward:', error);
+                } else {
+                  queryClient.invalidateQueries({ queryKey: ["rewards"] });
+                }
+              });
+          }
         }, 4400);
       }, 300);
     } else {
@@ -617,29 +632,7 @@ function RewardRoulette({
       setIsFinished(false);
       setAnimationPhase('initial');
     }
-  }, [show, habit.id, rewards]);
-
-  useEffect(() => {
-    if (!isFinished || rewardClaimed || !selectedReward || selectedReward.id <= 0) return;
-    setRewardClaimed(true);
-    (async () => {
-      try {
-        const { error } = await supabase
-          .from("rewards")
-          .update({ available: selectedReward.available + 1 })
-          .eq("id", selectedReward.id);
-        if (error) throw error;
-        queryClient.invalidateQueries({ queryKey: ["rewards"] });
-      } catch (error) {
-        console.error('Error claiming reward:', error);
-        toast({
-          title: "Error",
-          description: "Failed to add reward to your stash.",
-          variant: "destructive"
-        });
-      }
-    })();
-  }, [isFinished, rewardClaimed, selectedReward]);
+  }, [show, habit.id]);
 
   const getRewardStyles = () => {
     if (animationPhase === 'initial') {

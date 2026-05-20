@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useContext, useEffect, useState } from "react";
+import { createContext, ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { useMutation, UseMutationResult } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { queryClient } from "@/lib/queryClient";
@@ -44,6 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const isRegisteringRef = useRef(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -56,6 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (isRegisteringRef.current) return;
       const newUser = session?.user ? toAuthUser(session.user) : null;
       setUser((prev) => {
         if (prev?.id !== newUser?.id) {
@@ -92,20 +94,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!credentials.email.includes("@")) {
         throw new Error("Please enter a valid email address");
       }
+      isRegisteringRef.current = true;
       const { data, error } = await supabase.auth.signUp({
         email: credentials.email,
         password: credentials.password,
       });
-      if (error) throw new Error(error.message);
-      if (!data.user) throw new Error("Registration failed");
+      if (error) {
+        isRegisteringRef.current = false;
+        throw new Error(error.message);
+      }
+      if (!data.user) {
+        isRegisteringRef.current = false;
+        throw new Error("Registration failed");
+      }
       await seedDemoData(data.user.id).catch(() => {});
+      isRegisteringRef.current = false;
       return toAuthUser(data.user);
     },
     onSuccess: (user) => {
+      queryClient.clear();
       setUser(user);
-      queryClient.invalidateQueries();
     },
     onError: (error: Error) => {
+      isRegisteringRef.current = false;
       toast({ title: "Registration failed", description: error.message, variant: "destructive" });
     },
   });
