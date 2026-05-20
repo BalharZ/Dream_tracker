@@ -98,11 +98,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       if (error) throw new Error(error.message);
       if (!data.user) throw new Error("Registration failed");
-      // Seed demo data for the new user (non-blocking)
-      seedDemoData(data.user.id).catch(() => {});
+      await seedDemoData(data.user.id).catch(() => {});
       return toAuthUser(data.user);
     },
-    onSuccess: (user) => setUser(user),
+    onSuccess: (user) => {
+      setUser(user);
+      queryClient.invalidateQueries();
+    },
     onError: (error: Error) => {
       toast({ title: "Registration failed", description: error.message, variant: "destructive" });
     },

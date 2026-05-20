@@ -519,6 +519,7 @@ function RewardRoulette({
   const [isAnimating, setIsAnimating] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
   const [rewardCards, setRewardCards] = useState<Reward[]>([]);
+  const [rewardClaimed, setRewardClaimed] = useState(false);
 
   const fixedWinningIndex = 50;
 
@@ -526,6 +527,7 @@ function RewardRoulette({
     if (show) {
       setIsAnimating(true);
       setIsFinished(false);
+      setRewardClaimed(false);
       setAnimationPhase('initial');
 
       const emptySlot = {
@@ -617,19 +619,16 @@ function RewardRoulette({
     }
   }, [show, habit.id, rewards]);
 
-  const handleClaimReward = async () => {
-    if (selectedReward && selectedReward.id > 0) {
+  useEffect(() => {
+    if (!isFinished || rewardClaimed || !selectedReward || selectedReward.id <= 0) return;
+    setRewardClaimed(true);
+    (async () => {
       try {
-        onClose();
         const { error } = await supabase
           .from("rewards")
           .update({ available: selectedReward.available + 1 })
           .eq("id", selectedReward.id);
         if (error) throw error;
-        toast({
-          title: "Reward Added!",
-          description: "The reward has been added to your stash.",
-        });
         queryClient.invalidateQueries({ queryKey: ["rewards"] });
       } catch (error) {
         console.error('Error claiming reward:', error);
@@ -639,10 +638,8 @@ function RewardRoulette({
           variant: "destructive"
         });
       }
-    } else {
-      onClose();
-    }
-  };
+    })();
+  }, [isFinished, rewardClaimed, selectedReward]);
 
   const getRewardStyles = () => {
     if (animationPhase === 'initial') {
@@ -778,9 +775,14 @@ function RewardRoulette({
                   transition={{ duration: 0.5 }}
                 >
                   {selectedReward.id > 0 ? (
-                    <p className="text-green-400 font-medium text-lg">
-                      You won a <span className="font-bold">{selectedReward.name}</span>!
-                    </p>
+                    <>
+                      <p className="text-green-400 font-medium text-lg">
+                        You won a <span className="font-bold">{selectedReward.name}</span>!
+                      </p>
+                      <p className="text-gray-400 text-sm mt-1">
+                        You'll find your reward in Rewards.
+                      </p>
+                    </>
                   ) : (
                     <p className="text-amber-400 font-medium text-lg">
                       Keep building habits - progress itself is a valuable reward!
@@ -797,14 +799,14 @@ function RewardRoulette({
                   className="mx-auto"
                 >
                   <Button
-                    onClick={handleClaimReward}
+                    onClick={onClose}
                     className={`rounded-md font-bold ${
                       selectedReward.id > 0
                         ? "bg-green-600 hover:bg-green-700 text-white px-8 py-2"
                         : "bg-amber-600 hover:bg-amber-700 text-white"
                     }`}
                   >
-                    {selectedReward.id > 0 ? "Claim Reward" : "Continue"}
+                    Continue
                   </Button>
                 </motion.div>
               </div>
