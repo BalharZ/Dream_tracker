@@ -1,6 +1,7 @@
 import { createContext, ReactNode, useContext, useEffect, useState } from "react";
 import { useMutation, UseMutationResult } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { seedDemoData } from "@/lib/seed-demo-data";
 import { useToast } from "@/hooks/use-toast";
 import type { User } from "@supabase/supabase-js";
 
@@ -90,6 +91,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       if (error) throw new Error(error.message);
       if (!data.user) throw new Error("Registration failed");
+      // Seed demo data for the new user (non-blocking)
+      seedDemoData(data.user.id).catch(() => {});
       return toAuthUser(data.user);
     },
     onSuccess: (user) => setUser(user),

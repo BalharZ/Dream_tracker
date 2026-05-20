@@ -78,13 +78,17 @@ shared/
 - [x] Image gallery (Unsplash + Storage)
 - [x] Deployed to Vercel
 - [x] Demo data (Fit Body dream, 30h training goal, Workout habit, 3 rewards)
+- [x] Mobile layout: hamburger menu, fix overlapping header
+- [x] Mobile: Rewards buttons stack vertically
+- [x] Mobile: Habits sticky name column + scrollable date grid
+- [x] Email-based auth (replaced username trick, backward compat for old accounts)
+- [x] Demo data auto-seed on registration (src/lib/seed-demo-data.ts)
 
 ### TODO
-- [ ] Mobile layout: hamburger menu, fix overlapping header
-- [ ] Mobile: Rewards buttons stack vertically
-- [ ] Mobile: Habits sticky name column + scrollable date grid
 - [ ] Dashboard: show today's habits for quick entry (must trigger reward animation)
-- [ ] Email-based auth (replace username trick)
+- [ ] Onboarding wizard: guided tour on demo data, then "Delete demo data" button
+  - Future: add `is_demo` boolean column to dreams/goals/habits/rewards tables
+  - Button deletes only rows where is_demo=true, then hides itself
 - [ ] Google SSO login
 - [ ] Persistent session (auto-login)
 - [ ] Progress cascade: Habit → Goal → Dream
