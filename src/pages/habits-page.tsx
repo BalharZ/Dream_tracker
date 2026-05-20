@@ -212,10 +212,10 @@ function HabitsPage() {
           </div>
 
           <div className="relative">
-            {/* Grid with sticky left columns */}
+            {/* Horizontally scrollable grid */}
             <div className="flex overflow-x-auto">
-              {/* Sticky left: Habit + Target columns */}
-              <div className="flex-shrink-0 sticky left-0 z-10 bg-card border-r">
+              {/* Habit + Target columns */}
+              <div className="flex-shrink-0 border-r">
                 {/* Header row */}
                 <div className="flex border-b">
                   <div className="w-28 sm:w-48 px-3 py-3 text-sm font-medium text-muted-foreground">Habit</div>
