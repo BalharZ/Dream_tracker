@@ -18,7 +18,8 @@ Personal development app: **Dreams** (life visions) → **Goals** → **Habits**
 - All DB calls: React → Supabase JS client (no backend)
 - RLS on every table (user_id isolation)
 - snake_case DB columns = TypeScript types
-- Auth: username-only registration (`@dreamtracker.app` auto-appended for Supabase email auth)
+- Auth: email-based registration (old username accounts still work via `@dreamtracker.app` fallback in login)
+- New users get demo data auto-seeded on registration (see `src/lib/seed-demo-data.ts`)
 - Supabase free tier auto-pauses after 7 days inactivity
 
 ## Data Model
