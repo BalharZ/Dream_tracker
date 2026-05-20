@@ -11,6 +11,7 @@ export type Dream = {
 
 export type Goal = {
   id: number;
+  user_id: string;
   dream_id: number;
   parent_goal_id: number | null;
   name: string;

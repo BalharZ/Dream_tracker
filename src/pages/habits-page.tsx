@@ -28,12 +28,13 @@ function HabitsPage() {
   const [progressMap, setProgressMap] = useState<ProgressMap>({});
 
   const { data: habits, isLoading } = useQuery({
-    queryKey: ["habits"],
+    queryKey: ["habits", user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from("habits").select("*").order("created_at", { ascending: false });
+      const { data, error } = await supabase.from("habits").select("*").eq("user_id", user!.id).order("created_at", { ascending: false });
       if (error) throw error;
       return data as Habit[];
     },
+    enabled: !!user,
   });
 
   useEffect(() => {
@@ -72,21 +73,23 @@ function HabitsPage() {
   }).sort((a, b) => b.getTime() - a.getTime());
 
   const { data: goals } = useQuery({
-    queryKey: ["goals"],
+    queryKey: ["goals", user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from("goals").select("*").order("created_at", { ascending: false });
+      const { data, error } = await supabase.from("goals").select("*").eq("user_id", user!.id).order("created_at", { ascending: false });
       if (error) throw error;
       return data as Goal[];
     },
+    enabled: !!user,
   });
 
   const { data: rewards } = useQuery({
-    queryKey: ["rewards"],
+    queryKey: ["rewards", user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from("rewards").select("*").order("created_at", { ascending: false });
+      const { data, error } = await supabase.from("rewards").select("*").eq("user_id", user!.id).order("created_at", { ascending: false });
       if (error) throw error;
       return data as Reward[];
     },
+    enabled: !!user,
   });
 
   const deleteHabit = useMutation({

@@ -35,6 +35,7 @@ export async function seedDemoData(userId: string): Promise<void> {
     const { data: goal, error: goalErr } = await supabase
       .from("goals")
       .insert({
+        user_id: userId,
         dream_id: dream.id,
         name: "30 Hours of Training",
         image:

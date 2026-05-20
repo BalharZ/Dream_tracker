@@ -26,15 +26,17 @@ type Dream = {
 };
 
 export default function DreamsPage() {
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [selectedDream, setSelectedDream] = useState<Dream | null>(null);
   const { data: dreams, isLoading } = useQuery({
-    queryKey: ["dreams"],
+    queryKey: ["dreams", user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from("dreams").select("*").order("created_at", { ascending: false });
+      const { data, error } = await supabase.from("dreams").select("*").eq("user_id", user!.id).order("created_at", { ascending: false });
       if (error) throw error;
       return data as Dream[];
     },
+    enabled: !!user,
   });
 
   const deleteDream = useMutation({
@@ -43,7 +45,7 @@ export default function DreamsPage() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["dreams"] });
+      queryClient.invalidateQueries({ queryKey: ["dreams", user?.id] });
       setOpen(false);
       setSelectedDream(null);
     },
@@ -161,6 +163,7 @@ function AddDreamForm({ dream, onSuccess, onDelete }: { dream?: Dream | null; on
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["dreams"] });
+      queryClient.invalidateQueries({ queryKey: ["goals"] });
       form.reset();
       onSuccess();
     },

@@ -2,20 +2,24 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Reward } from "@shared/schema";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/hooks/use-auth";
 import { Gift } from "lucide-react";
 
 export default function StashPage() {
+  const { user } = useAuth();
   const { data: rewards, isLoading } = useQuery({
-    queryKey: ["stash"],
+    queryKey: ["stash", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("rewards")
         .select("*")
+        .eq("user_id", user!.id)
         .gt("available", 0)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data as Reward[];
     },
+    enabled: !!user,
   });
 
   if (isLoading) {

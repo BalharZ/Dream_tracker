@@ -1,4 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -89,26 +90,29 @@ function GoalCard({ goal, dream, subgoals, onEdit, onDelete }: {
 }
 
 export default function GoalsPage() {
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
   const { toast } = useToast();
 
   const { data: dreams } = useQuery({
-    queryKey: ["dreams"],
+    queryKey: ["dreams", user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from("dreams").select("id, name, image, progress");
+      const { data, error } = await supabase.from("dreams").select("id, name, image, progress").eq("user_id", user!.id);
       if (error) throw error;
       return data as Dream[];
     },
+    enabled: !!user,
   });
 
   const { data: goals, isLoading } = useQuery({
-    queryKey: ["goals"],
+    queryKey: ["goals", user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from("goals").select("*").order("created_at", { ascending: false });
+      const { data, error } = await supabase.from("goals").select("*").eq("user_id", user!.id).order("created_at", { ascending: false });
       if (error) throw error;
       return data as Goal[];
     },
+    enabled: !!user,
   });
 
   const goalsByParent = goals?.reduce((acc, goal) => {
@@ -193,6 +197,7 @@ export default function GoalsPage() {
 function AddGoalForm({ dreams, goals, goal, onSuccess }: {
   dreams: Dream[]; goals: Goal[]; goal?: Goal | null; onSuccess: () => void;
 }) {
+  const { user } = useAuth();
   const [subgoals, setSubgoals] = useState<{ name: string; final_count: number; unit: string; id?: number; isNew?: boolean }[]>([]);
 
   useEffect(() => {
@@ -224,7 +229,7 @@ function AddGoalForm({ dreams, goals, goal, onSuccess }: {
         if (error) throw error;
       } else {
         const { data, error } = await supabase.from("goals").insert({
-          name: values.name, dream_id: values.dream_id, image: values.image || "placeholder.jpg",
+          user_id: user!.id, name: values.name, dream_id: values.dream_id, image: values.image || "placeholder.jpg",
           final_count: values.final_count, unit: values.unit,
         }).select().single();
         if (error) throw error;
@@ -232,7 +237,7 @@ function AddGoalForm({ dreams, goals, goal, onSuccess }: {
         for (const sg of subgoals) {
           if (sg.name) {
             await supabase.from("goals").insert({
-              name: sg.name, dream_id: values.dream_id, parent_goal_id: data.id,
+              user_id: user!.id, name: sg.name, dream_id: values.dream_id, parent_goal_id: data.id,
               image: "placeholder.jpg", final_count: sg.final_count, unit: sg.unit,
             });
           }

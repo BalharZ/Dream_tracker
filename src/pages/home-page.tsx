@@ -12,21 +12,23 @@ export default function HomePage() {
   const { user } = useAuth();
 
   const { data: dreams, isLoading: dreamsLoading } = useQuery({
-    queryKey: ["dreams"],
+    queryKey: ["dreams", user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from("dreams").select("*").order("created_at", { ascending: false });
+      const { data, error } = await supabase.from("dreams").select("*").eq("user_id", user!.id).order("created_at", { ascending: false });
       if (error) throw error;
       return data;
     },
+    enabled: !!user,
   });
 
   const { data: goals, isLoading: goalsLoading } = useQuery({
-    queryKey: ["goals"],
+    queryKey: ["goals", user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from("goals").select("*").order("created_at", { ascending: false });
+      const { data, error } = await supabase.from("goals").select("*").eq("user_id", user!.id).order("created_at", { ascending: false });
       if (error) throw error;
       return data;
     },
+    enabled: !!user,
   });
 
   return (

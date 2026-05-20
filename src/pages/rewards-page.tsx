@@ -392,16 +392,18 @@ function AddRewardForm({
 }
 
 export default function RewardsPage() {
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [selectedReward, setSelectedReward] = useState<Reward | null>(null);
 
   const { data: rewards, isLoading } = useQuery({
-    queryKey: ["rewards"],
+    queryKey: ["rewards", user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from("rewards").select("*").order("created_at", { ascending: false });
+      const { data, error } = await supabase.from("rewards").select("*").eq("user_id", user!.id).order("created_at", { ascending: false });
       if (error) throw error;
       return data as Reward[];
     },
+    enabled: !!user,
   });
 
   if (isLoading) {

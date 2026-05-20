@@ -1,6 +1,7 @@
 import { createContext, ReactNode, useContext, useEffect, useState } from "react";
 import { useMutation, UseMutationResult } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { queryClient } from "@/lib/queryClient";
 import { seedDemoData } from "@/lib/seed-demo-data";
 import { useToast } from "@/hooks/use-toast";
 import type { User } from "@supabase/supabase-js";
@@ -55,7 +56,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ? toAuthUser(session.user) : null);
+      const newUser = session?.user ? toAuthUser(session.user) : null;
+      setUser((prev) => {
+        if (prev?.id !== newUser?.id) {
+          queryClient.clear();
+        }
+        return newUser;
+      });
     });
 
     return () => subscription.unsubscribe();
@@ -106,7 +113,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { error } = await supabase.auth.signOut();
       if (error) throw new Error(error.message);
     },
-    onSuccess: () => setUser(null),
+    onSuccess: () => {
+      queryClient.clear();
+      setUser(null);
+    },
     onError: (error: Error) => {
       toast({ title: "Logout failed", description: error.message, variant: "destructive" });
     },
