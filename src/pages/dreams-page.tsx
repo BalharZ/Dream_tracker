@@ -9,7 +9,7 @@ import { supabase } from "@/lib/supabase";
 import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { Progress } from "@/components/ui/progress";
-import { Plus, Loader2, Trash2, ImageIcon } from "lucide-react";
+import { Plus, Loader2, Trash2, ImageIcon, X } from "lucide-react";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormDescription } from "@/components/ui/form";
 import { useState } from "react";
 import { ImageGallery } from "@/components/images/image-gallery";
@@ -208,6 +208,17 @@ function AddDreamForm({ dream, onSuccess, onDelete }: { dream?: Dream | null; on
                     {...field}
                   />
                 </FormControl>
+                {field.value && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => form.setValue("image", "")}
+                    title="Clear image"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
                 <Button
                   type="button"
                   variant="outline"

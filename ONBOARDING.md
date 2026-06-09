@@ -1,6 +1,7 @@
 # Dream Tracker - Project Instructions
 
 > **Language note**: The app UI is in English. Communicate with the owner in Czech.
+> **Work plan**: viz [SESSIONS.md](SESSIONS.md) — backlog úprav rozdělený na samostatné sessiony (1 session = 1 konverzace).
 
 ## What is this?
 Personal development app: **Dreams** (life visions) → **Goals** → **Habits** (daily tracking) → **Rewards** (CS:GO-style roulette on habit completion). Migrated from Express.js + Neon to Supabase + Vercel.

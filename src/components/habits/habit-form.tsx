@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { NumberStepper } from "@/components/ui/number-stepper";
 import {
   Form,
   FormControl,
@@ -31,7 +31,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Edit, Gift, Loader2, PlusCircle, X } from "lucide-react";
+import { Edit, Gift, Loader2, PlusCircle, X, Image as ImageIcon } from "lucide-react";
+import { ImageGallery } from "@/components/images/image-gallery";
 
 export function HabitForm({
   goals,
@@ -53,6 +54,23 @@ export function HabitForm({
   const [noRewards, setNoRewards] = useState(false);
   const [selectedRewards, setSelectedRewards] = useState<number[]>([]);
   const [rewardChances, setRewardChances] = useState<Record<number, number>>({});
+  const [showCreateReward, setShowCreateReward] = useState(false);
+  const [newRewardName, setNewRewardName] = useState("");
+  const [newRewardImage, setNewRewardImage] = useState("");
+  const [rewardGalleryOpen, setRewardGalleryOpen] = useState(false);
+
+  // Distribute ~50% across the selected rewards (evenly) and leave ~50% for
+  // the "no reward" outcome. Re-runs whenever rewards are added/removed.
+  const distributeChances = (ids: number[]): Record<number, number> => {
+    const result: Record<number, number> = {};
+    if (ids.length === 0) return result;
+    const share = Math.floor(50 / ids.length);
+    const remainder = 50 - share * ids.length;
+    ids.forEach((id, i) => {
+      result[id] = share + (i < remainder ? 1 : 0);
+    });
+    return result;
+  };
 
   const colorPresets = [
     "#4299E1", "#48BB78", "#F56565", "#ED8936", "#D69E2E",
@@ -279,6 +297,45 @@ export function HabitForm({
     },
   });
 
+  const createInlineReward = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase
+        .from("rewards")
+        .insert({
+          name: newRewardName.trim(),
+          image: newRewardImage,
+          habit_chances: "{}",
+          user_id: user!.id,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return data as Reward;
+    },
+    onSuccess: (newReward) => {
+      queryClient.invalidateQueries({ queryKey: ["rewards"] });
+      const next = [...selectedRewards, newReward.id];
+      setSelectedRewards(next);
+      setRewardChances(distributeChances(next));
+      setNoRewards(false);
+      setShowCreateReward(false);
+      setNewRewardName("");
+      setNewRewardImage("");
+      toast({
+        title: "Reward created!",
+        description: "It was added to this habit.",
+      });
+    },
+    onError: (error) => {
+      console.error(error);
+      toast({
+        title: "Error!",
+        description: "Failed to create reward.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const rootGoals = goals?.filter((goal) => !goal.parent_goal_id && goal.id) || [];
   const subgoals = goals?.filter((goal) => {
     if (!goal.parent_goal_id || !goal.id) return false;
@@ -321,7 +378,15 @@ export function HabitForm({
 
           <Form {...form}>
             <form
-              onSubmit={form.handleSubmit((data) => createHabit.mutate(data))}
+              onSubmit={form.handleSubmit((data) =>
+                createHabit.mutate({
+                  ...data,
+                  target_value:
+                    data.target_value === "" || data.target_value === null
+                      ? 0
+                      : Number(data.target_value),
+                })
+              )}
               className="space-y-4"
             >
               <FormField
@@ -392,11 +457,10 @@ export function HabitForm({
                     <FormItem>
                       <FormLabel>Target Value</FormLabel>
                       <FormControl>
-                        <Input
-                          type="number"
-                          placeholder="0"
-                          {...field}
-                          onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                        <NumberStepper
+                          min={0}
+                          value={field.value ?? ""}
+                          onChange={field.onChange}
                         />
                       </FormControl>
                     </FormItem>
@@ -563,38 +627,36 @@ export function HabitForm({
                             </div>
                             <div className="flex flex-col flex-1 min-w-0">
                               <span className="font-medium text-sm truncate">{reward.name}</span>
-                              <div className="flex items-center gap-1">
+                              <div className="flex items-center gap-2 mt-1">
                                 <span className="text-xs text-muted-foreground">Chance:</span>
-                                <input
-                                  type="text"
-                                  className="w-12 h-6 text-xs border rounded"
-                                  value={rewardChances[reward.id] || ""}
-                                  onChange={(e) => {
-                                    if (e.target.value === "") {
-                                      setRewardChances(prev => ({ ...prev, [reward.id]: 0 }));
-                                      return;
-                                    }
-                                    const numValue = parseInt(e.target.value);
-                                    if (!isNaN(numValue)) {
-                                      const boundedValue = Math.max(1, Math.min(100, numValue));
-                                      let otherChances = 0;
-                                      for (const id of selectedRewards) {
-                                        if (id !== reward.id) {
-                                          otherChances += rewardChances[id] || 0;
+                                {(() => {
+                                  let otherChances = 0;
+                                  for (const id of selectedRewards) {
+                                    if (id !== reward.id) otherChances += rewardChances[id] || 0;
+                                  }
+                                  const maxAllowed = 100 - otherChances;
+                                  return (
+                                    <NumberStepper
+                                      min={1}
+                                      max={maxAllowed}
+                                      step={5}
+                                      value={rewardChances[reward.id] ?? ""}
+                                      onChange={(val) => {
+                                        if (val === "") {
+                                          setRewardChances(prev => ({ ...prev, [reward.id]: 0 }));
+                                          return;
                                         }
-                                      }
-                                      const maxAllowed = 100 - otherChances;
-                                      const finalValue = Math.min(boundedValue, maxAllowed);
-                                      setRewardChances(prev => ({ ...prev, [reward.id]: finalValue }));
-                                    }
-                                  }}
-                                  onBlur={() => {
-                                    const currentValue = rewardChances[reward.id] || 0;
-                                    if (currentValue < 1) {
-                                      setRewardChances(prev => ({ ...prev, [reward.id]: 1 }));
-                                    }
-                                  }}
-                                />
+                                        const num = Math.round(Number(val));
+                                        if (Number.isNaN(num)) return;
+                                        const finalValue = Math.max(0, Math.min(num, maxAllowed));
+                                        setRewardChances(prev => ({ ...prev, [reward.id]: finalValue }));
+                                      }}
+                                      className="w-32"
+                                      inputClassName="h-8"
+                                      buttonClassName="h-8 w-8"
+                                    />
+                                  );
+                                })()}
                                 <span className="text-xs text-muted-foreground">%</span>
                               </div>
                             </div>
@@ -604,11 +666,9 @@ export function HabitForm({
                               size="icon"
                               className="h-8 w-8"
                               onClick={() => {
-                                setSelectedRewards(prev => prev.filter(id => id !== reward.id));
-                                setRewardChances(prev => {
-                                  const { [reward.id]: _, ...rest } = prev;
-                                  return rest;
-                                });
+                                const next = selectedRewards.filter(id => id !== reward.id);
+                                setSelectedRewards(next);
+                                setRewardChances(distributeChances(next));
                               }}
                             >
                               <X className="h-4 w-4" />
@@ -646,40 +706,6 @@ export function HabitForm({
                   </div>
                 )}
               </div>
-
-              <FormField
-                control={form.control}
-                name="positive_motivation"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>What will you gain from this habit?</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="e.g. I will feel energized, improve my health, ..."
-                        {...field}
-                        value={field.value || ""}
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="negative_motivation"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>What will happen if you don't do this?</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="e.g. I'll continue to feel tired, my health will decline, ..."
-                        {...field}
-                        value={field.value || ""}
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
 
               <div className="flex gap-2 justify-end items-center mt-6">
                 {habit && onDelete && (
@@ -733,6 +759,89 @@ export function HabitForm({
             </DialogDescription>
           </DialogHeader>
 
+          <div className="my-4">
+            {showCreateReward ? (
+              <div className="space-y-3 border rounded-md p-3">
+                <Input
+                  placeholder="Reward name"
+                  value={newRewardName}
+                  onChange={(e) => setNewRewardName(e.target.value)}
+                />
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Image URL or select from gallery"
+                    value={newRewardImage}
+                    onChange={(e) => setNewRewardImage(e.target.value)}
+                  />
+                  {newRewardImage && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setNewRewardImage("")}
+                      title="Clear image"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setRewardGalleryOpen(true)}
+                  >
+                    <ImageIcon className="h-4 w-4" />
+                  </Button>
+                </div>
+                {newRewardImage && (
+                  <div className="w-full h-28 rounded-md overflow-hidden border bg-muted flex items-center justify-center">
+                    <img
+                      src={newRewardImage}
+                      alt="Reward preview"
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+                )}
+                <div className="flex justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setShowCreateReward(false);
+                      setNewRewardName("");
+                      setNewRewardImage("");
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={!newRewardName.trim() || createInlineReward.isPending}
+                    onClick={() => createInlineReward.mutate()}
+                  >
+                    {createInlineReward.isPending && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    Create
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full mb-4"
+                onClick={() => setShowCreateReward(true)}
+              >
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Create new reward
+              </Button>
+            )}
+          </div>
+
           <div className="space-y-4 my-4">
             {rewards.length === 0 ? (
               <div className="text-center p-4 border rounded-md">
@@ -757,24 +866,11 @@ export function HabitForm({
                       : 'hover:bg-accent'
                     }`}
                     onClick={() => {
-                      if (selectedRewards.includes(reward.id)) {
-                        setSelectedRewards(prev => prev.filter(id => id !== reward.id));
-                        setRewardChances(prev => {
-                          const { [reward.id]: _, ...rest } = prev;
-                          return rest;
-                        });
-                      } else {
-                        let totalChance = 0;
-                        for (const id of selectedRewards) {
-                          totalChance += rewardChances[id] || 0;
-                        }
-                        const defaultChance = Math.min(20, 100 - totalChance);
-                        setSelectedRewards(prev => [...prev, reward.id]);
-                        setRewardChances(prev => ({
-                          ...prev,
-                          [reward.id]: Math.max(1, defaultChance)
-                        }));
-                      }
+                      const next = selectedRewards.includes(reward.id)
+                        ? selectedRewards.filter(id => id !== reward.id)
+                        : [...selectedRewards, reward.id];
+                      setSelectedRewards(next);
+                      setRewardChances(distributeChances(next));
                     }}
                   >
                     <input
@@ -828,6 +924,12 @@ export function HabitForm({
               Done
             </Button>
           </div>
+
+          <ImageGallery
+            isOpen={rewardGalleryOpen}
+            setIsOpen={setRewardGalleryOpen}
+            onSelect={(url) => setNewRewardImage(url)}
+          />
         </DialogContent>
       </Dialog>
     </>

@@ -7,6 +7,8 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Star, Target } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { TodayHabits } from "@/components/habits/today-habits";
+import { QuickRewards } from "@/components/rewards/quick-rewards";
 
 export default function HomePage() {
   const { user } = useAuth();
@@ -34,11 +36,15 @@ export default function HomePage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold mb-2">Welcome, {user?.displayName}!</h1>
+        <h1 className="text-3xl font-bold mb-2">Welcome back!</h1>
         <p className="text-muted-foreground">
           Track your progress and achieve your dreams
         </p>
       </div>
+
+      <TodayHabits />
+
+      <QuickRewards />
 
       <div className="grid md:grid-cols-2 gap-6">
         <Card>

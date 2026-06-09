@@ -23,6 +23,7 @@ import {
 import { useForm } from "react-hook-form";
 import { supabase } from "@/lib/supabase";
 import { queryClient } from "@/lib/queryClient";
+import { recomputeProgress } from "@/lib/progress";
 import { Progress } from "@/components/ui/progress";
 import { Plus, Loader2, ChevronRight, Trash2 } from "lucide-react";
 import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
@@ -131,6 +132,7 @@ export default function GoalsPage() {
     mutationFn: async ({ goalId }: { goalId: number; keepProgress: boolean }) => {
       const { error } = await supabase.from("goals").delete().eq("id", goalId);
       if (error) throw error;
+      await recomputeProgress(user!.id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["goals"] });
@@ -175,7 +177,7 @@ export default function GoalsPage() {
           <DialogTrigger asChild>
             <Button onClick={() => setSelectedGoal(null)}><Plus className="h-4 w-4 mr-2" />Add Goal</Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle>{selectedGoal ? "Edit Goal" : "Add New Goal"}</DialogTitle></DialogHeader>
             <AddGoalForm dreams={dreams || []} goals={goals || []} goal={selectedGoal}
               onSuccess={() => { setOpen(false); setSelectedGoal(null); }} />
@@ -185,7 +187,7 @@ export default function GoalsPage() {
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {goalsByParent['root']?.map((goal) => (
-          <GoalCard key={goal.id} goal={goal} subgoals={goalsByParent[goal.id] || []}
+          <GoalCard key={goal.id} goal={goal} subgoals={(goalsByParent[goal.id] || []).slice().sort((a, b) => a.id - b.id)}
             dream={dreams?.find((d) => d.id === goal.dream_id)}
             onEdit={(g) => { setSelectedGoal(g); setOpen(true); }} onDelete={showDeleteConfirmation} />
         ))}
@@ -198,13 +200,14 @@ function AddGoalForm({ dreams, goals, goal, onSuccess }: {
   dreams: Dream[]; goals: Goal[]; goal?: Goal | null; onSuccess: () => void;
 }) {
   const { user } = useAuth();
-  const [subgoals, setSubgoals] = useState<{ name: string; final_count: number; unit: string; id?: number; isNew?: boolean }[]>([]);
+  const [subgoals, setSubgoals] = useState<{ name: string; final_count: number | string; unit: string; id?: number }[]>([]);
 
   useEffect(() => {
     if (goal) {
-      const existing = goals.filter(g => g.parent_goal_id === goal.id).map(g => ({
-        name: g.name, final_count: g.final_count, unit: g.unit, id: g.id
-      }));
+      const existing = goals
+        .filter(g => g.parent_goal_id === goal.id)
+        .sort((a, b) => a.id - b.id)
+        .map(g => ({ name: g.name, final_count: g.final_count, unit: g.unit, id: g.id }));
       setSubgoals(existing);
     }
   }, [goal, goals]);
@@ -214,35 +217,64 @@ function AddGoalForm({ dreams, goals, goal, onSuccess }: {
       name: goal?.name || "",
       dream_id: goal?.dream_id || (dreams[0]?.id || 0),
       image: goal?.image || "placeholder.jpg",
-      final_count: goal?.final_count || 100,
+      final_count: (goal?.final_count ?? 100) as number | string,
       unit: goal?.unit || "",
     },
   });
 
+  const hasSubgoals = subgoals.length > 0;
+  const subgoalSum = subgoals.reduce((acc, sg) => acc + (parseFloat(String(sg.final_count)) || 0), 0);
+
   const createGoal = useMutation({
     mutationFn: async (values: any) => {
+      const finalCount = hasSubgoals ? subgoalSum : (parseFloat(String(values.final_count)) || 0);
+
+      let goalId: number;
       if (goal) {
         const { error } = await supabase.from("goals").update({
           name: values.name, dream_id: values.dream_id, image: values.image,
-          final_count: values.final_count, unit: values.unit,
+          final_count: finalCount, unit: values.unit,
         }).eq("id", goal.id);
         if (error) throw error;
+        goalId = goal.id;
       } else {
         const { data, error } = await supabase.from("goals").insert({
           user_id: user!.id, name: values.name, dream_id: values.dream_id, image: values.image || "placeholder.jpg",
-          final_count: values.final_count, unit: values.unit,
+          final_count: finalCount, unit: values.unit,
         }).select().single();
         if (error) throw error;
+        goalId = data.id;
+      }
 
-        for (const sg of subgoals) {
-          if (sg.name) {
-            await supabase.from("goals").insert({
-              user_id: user!.id, name: sg.name, dream_id: values.dream_id, parent_goal_id: data.id,
-              image: "placeholder.jpg", final_count: sg.final_count, unit: sg.unit,
-            });
-          }
+      // Sync subgoals for both create and edit: update existing by id, insert new, delete removed.
+      const existingIds = goal ? goals.filter(g => g.parent_goal_id === goal.id).map(g => g.id) : [];
+      const keptIds = subgoals.filter(sg => sg.id).map(sg => sg.id as number);
+      const deletedIds = existingIds.filter(id => !keptIds.includes(id));
+
+      for (const delId of deletedIds) {
+        const { error } = await supabase.from("goals").delete().eq("id", delId);
+        if (error) throw error;
+      }
+
+      for (const sg of subgoals) {
+        if (!sg.name) continue;
+        const sgFinal = parseFloat(String(sg.final_count)) || 0;
+        if (sg.id) {
+          const { error } = await supabase.from("goals").update({
+            name: sg.name, dream_id: values.dream_id, final_count: sgFinal, unit: sg.unit,
+          }).eq("id", sg.id);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.from("goals").insert({
+            user_id: user!.id, name: sg.name, dream_id: values.dream_id, parent_goal_id: goalId,
+            image: "placeholder.jpg", final_count: sgFinal, unit: sg.unit,
+          });
+          if (error) throw error;
         }
       }
+
+      // Final counts / subgoal structure changed -> recompute the cascade.
+      await recomputeProgress(user!.id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["goals"] });
@@ -273,32 +305,49 @@ function AddGoalForm({ dreams, goals, goal, onSuccess }: {
         )} />
 
         <div className="grid grid-cols-2 gap-4">
-          <FormField control={form.control} name="final_count" render={({ field }) => (
-            <FormItem><FormLabel>Final Count (100%)</FormLabel><FormControl>
-              <Input type="number" min="1" placeholder="e.g. 100" {...field} onChange={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v) && v > 0) field.onChange(v); }} />
-            </FormControl></FormItem>
-          )} />
+          {hasSubgoals ? (
+            <FormItem>
+              <FormLabel>Final Count (100%)</FormLabel>
+              <FormControl>
+                <Input type="number" value={subgoalSum} disabled readOnly />
+              </FormControl>
+              <p className="text-xs text-muted-foreground">Auto-summed from subgoals</p>
+            </FormItem>
+          ) : (
+            <FormField control={form.control} name="final_count" render={({ field }) => (
+              <FormItem><FormLabel>Final Count (100%)</FormLabel><FormControl>
+                <Input type="number" min="1" placeholder="e.g. 100" {...field}
+                  onChange={(e) => field.onChange(e.target.value === '' ? '' : (parseFloat(e.target.value) || 0))} />
+              </FormControl></FormItem>
+            )} />
+          )}
           <FormField control={form.control} name="unit" render={({ field }) => (
             <FormItem><FormLabel>Unit</FormLabel><FormControl><Input placeholder="e.g. kg, books, days" {...field} /></FormControl></FormItem>
           )} />
         </div>
 
         <div className="border rounded-md p-4 space-y-1 mt-4">
-          <div className="flex justify-between items-center">
-            <h3 className="text-sm font-medium mb-2">Subgoals</h3>
-            <Button type="button" variant="outline" size="sm" onClick={() => setSubgoals([...subgoals, { name: "", final_count: 100, unit: form.getValues("unit") || "", isNew: true }])}>
-              <Plus className="h-4 w-4 mr-2" />Add Subgoal
-            </Button>
-          </div>
+          <h3 className="text-sm font-medium mb-2">Subgoals</h3>
           {subgoals.map((sg, i) => (
-            <div key={i} className="grid grid-cols-12 gap-2 py-2 border-t items-center">
+            <div key={sg.id ?? `new-${i}`} className="grid grid-cols-12 gap-2 py-2 border-t items-center">
               <div className="col-span-5"><Input placeholder="Subgoal name" value={sg.name} onChange={(e) => { const n = [...subgoals]; n[i] = { ...n[i], name: e.target.value }; setSubgoals(n); }} /></div>
-              <div className="col-span-3"><Input type="number" min="1" value={sg.final_count} onChange={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v) && v > 0) { const n = [...subgoals]; n[i] = { ...n[i], final_count: v }; setSubgoals(n); } }} /></div>
+              <div className="col-span-3"><Input type="number" min="1" placeholder="Count" value={sg.final_count} onChange={(e) => { const n = [...subgoals]; n[i] = { ...n[i], final_count: e.target.value === '' ? '' : (parseFloat(e.target.value) || 0) }; setSubgoals(n); }} /></div>
               <div className="col-span-3"><Input placeholder="Unit" value={sg.unit} onChange={(e) => { const n = [...subgoals]; n[i] = { ...n[i], unit: e.target.value }; setSubgoals(n); }} /></div>
               <div className="col-span-1 text-center"><Button type="button" variant="ghost" size="icon" onClick={() => { const n = [...subgoals]; n.splice(i, 1); setSubgoals(n); }} className="text-destructive h-8 w-8"><Trash2 className="h-4 w-4" /></Button></div>
             </div>
           ))}
           {subgoals.length === 0 && <div className="text-sm text-muted-foreground py-2">No subgoals added yet.</div>}
+          {hasSubgoals && (
+            <div className="flex justify-between items-center pt-3 mt-1 border-t text-sm font-medium">
+              <span>Total (final count)</span>
+              <span>{subgoalSum} {form.watch("unit")}</span>
+            </div>
+          )}
+          <div className="pt-3">
+            <Button type="button" variant="outline" size="sm" className="w-full" onClick={() => setSubgoals([...subgoals, { name: "", final_count: 100, unit: form.getValues("unit") || "" }])}>
+              <Plus className="h-4 w-4 mr-2" />Add Subgoal
+            </Button>
+          </div>
         </div>
 
         <Button type="submit" className="w-full" disabled={createGoal.isPending}>

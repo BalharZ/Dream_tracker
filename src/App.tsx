@@ -11,6 +11,7 @@ import DreamsPage from "@/pages/dreams-page";
 import GoalsPage from "@/pages/goals-page";
 import HabitsPage from "@/pages/habits-page";
 import RewardsPage from "@/pages/rewards-page";
+import StashPage from "@/pages/stash-page";
 import MainLayout from "./components/layouts/main-layout";
 
 function Router() {
@@ -21,6 +22,7 @@ function Router() {
       <ProtectedRoute path="/dreams" component={DreamsPage} />
       <ProtectedRoute path="/goals" component={GoalsPage} />
       <ProtectedRoute path="/rewards" component={RewardsPage} />
+      <ProtectedRoute path="/stash" component={StashPage} />
       <ProtectedRoute path="/habits" component={HabitsPage} />
       <Route component={NotFound} />
     </Switch>

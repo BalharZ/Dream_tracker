@@ -39,10 +39,17 @@ export default function StashPage() {
         {rewards?.map((reward) => (
           <Card key={reward.id}>
             <CardContent className="pt-6">
-              <div
-                className="w-full h-32 mb-4 rounded-lg bg-cover bg-center"
-                style={{ backgroundImage: `url(${reward.image})` }}
-              />
+              <div className="w-full h-32 mb-4 rounded-lg bg-muted overflow-hidden flex items-center justify-center">
+                {reward.image ? (
+                  <img
+                    src={reward.image}
+                    alt={reward.name}
+                    className="w-full h-full object-contain"
+                  />
+                ) : (
+                  <Gift className="h-10 w-10 text-muted-foreground" />
+                )}
+              </div>
               <div className="flex items-center gap-2 mb-2">
                 <Gift className="h-5 w-5 text-primary" />
                 <h3 className="text-xl font-semibold">{reward.name}</h3>

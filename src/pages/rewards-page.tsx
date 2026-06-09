@@ -14,7 +14,8 @@ import { Reward } from "@shared/schema";
 import { supabase } from "@/lib/supabase";
 import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
-import { Plus, Loader2, Pencil, Trash2, Library } from "lucide-react";
+import { Plus, Loader2, Pencil, Trash2, Library, Image as ImageIcon, X } from "lucide-react";
+import { ImageGallery } from "@/components/images/image-gallery";
 import {
   Form,
   FormControl,
@@ -159,10 +160,19 @@ function RewardCard({ reward, onClick }: { reward: Reward; onClick: () => void }
       </div>
       <CardContent className="pt-6">
         <div
-          className="w-full h-32 mb-4 rounded-lg bg-cover bg-center cursor-pointer"
-          style={{ backgroundImage: `url(${reward.image})` }}
+          className="w-full h-32 mb-4 rounded-lg bg-muted overflow-hidden cursor-pointer flex items-center justify-center"
           onClick={onClick}
-        />
+        >
+          {reward.image ? (
+            <img
+              src={reward.image}
+              alt={reward.name}
+              className="w-full h-full object-contain"
+            />
+          ) : (
+            <ImageIcon className="h-10 w-10 text-muted-foreground" />
+          )}
+        </div>
         <div className="space-y-2">
           <div className="flex justify-between items-center">
             <h3
@@ -217,7 +227,9 @@ function BrowseRewardsDialog() {
   });
 
   const categories = Object.keys(presetRewards);
-  const displayRewards = selectedCategory ? presetRewards[selectedCategory] : [];
+  const displayRewards = selectedCategory
+    ? presetRewards[selectedCategory]
+    : categories.flatMap((c) => presetRewards[c]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -234,13 +246,16 @@ function BrowseRewardsDialog() {
 
         <div className="space-y-4">
           <Select
-            value={selectedCategory || ""}
-            onValueChange={(value) => setSelectedCategory(value)}
+            value={selectedCategory || "all"}
+            onValueChange={(value) =>
+              setSelectedCategory(value === "all" ? null : value)
+            }
           >
             <SelectTrigger>
-              <SelectValue placeholder="Select a category" />
+              <SelectValue placeholder="All categories" />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="all">All categories</SelectItem>
               {categories.map((category) => (
                 <SelectItem key={category} value={category}>
                   {category}
@@ -249,28 +264,29 @@ function BrowseRewardsDialog() {
             </SelectContent>
           </Select>
 
-          {selectedCategory && (
-            <div className="grid grid-cols-2 gap-4">
-              {displayRewards.map((reward, index) => (
-                <Card
-                  key={index}
-                  className="cursor-pointer hover:ring-2 hover:ring-primary transition-all"
-                  onClick={() => {
-                    createReward.mutate(reward);
-                    setOpen(false);
-                  }}
-                >
-                  <CardContent className="p-4">
-                    <div
-                      className="w-full h-24 mb-2 rounded-lg bg-cover bg-center"
-                      style={{ backgroundImage: `url(${reward.image})` }}
+          <div className="grid grid-cols-2 gap-4">
+            {displayRewards.map((reward, index) => (
+              <Card
+                key={index}
+                className="cursor-pointer hover:ring-2 hover:ring-primary transition-all"
+                onClick={() => {
+                  createReward.mutate(reward);
+                  setOpen(false);
+                }}
+              >
+                <CardContent className="p-4">
+                  <div className="w-full h-24 mb-2 rounded-lg bg-muted overflow-hidden flex items-center justify-center">
+                    <img
+                      src={reward.image}
+                      alt={reward.name}
+                      className="w-full h-full object-contain"
                     />
-                    <h3 className="text-sm font-medium text-center">{reward.name}</h3>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
+                  </div>
+                  <h3 className="text-sm font-medium text-center">{reward.name}</h3>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
       </DialogContent>
     </Dialog>
@@ -285,6 +301,7 @@ function AddRewardForm({
   onSuccess: () => void;
 }) {
   const { user } = useAuth();
+  const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const form = useForm({
     defaultValues: {
       name: reward?.name || "",
@@ -352,13 +369,50 @@ function AddRewardForm({
           name="image"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Image URL</FormLabel>
-              <FormControl>
-                <Input
-                  placeholder="Enter an image URL for visualization"
-                  {...field}
-                />
-              </FormControl>
+              <FormLabel>Reward Image</FormLabel>
+              <div className="flex gap-2">
+                <FormControl>
+                  <Input
+                    placeholder="Enter an image URL or select from gallery"
+                    {...field}
+                  />
+                </FormControl>
+                {field.value && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => form.setValue("image", "")}
+                    title="Clear image"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setIsGalleryOpen(true)}
+                >
+                  <ImageIcon className="h-4 w-4" />
+                </Button>
+              </div>
+
+              {field.value && (
+                <div className="mt-2 w-full h-40 rounded-md overflow-hidden border bg-muted flex items-center justify-center">
+                  <img
+                    src={field.value}
+                    alt="Reward preview"
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+              )}
+
+              <ImageGallery
+                isOpen={isGalleryOpen}
+                setIsOpen={setIsGalleryOpen}
+                onSelect={(imageUrl) => form.setValue("image", imageUrl)}
+              />
             </FormItem>
           )}
         />
@@ -399,7 +453,7 @@ export default function RewardsPage() {
   const { data: rewards, isLoading } = useQuery({
     queryKey: ["rewards", user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from("rewards").select("*").eq("user_id", user!.id).order("created_at", { ascending: false });
+      const { data, error } = await supabase.from("rewards").select("*").eq("user_id", user!.id).order("available", { ascending: false }).order("created_at", { ascending: false });
       if (error) throw error;
       return data as Reward[];
     },
