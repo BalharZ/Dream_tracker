@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { NumberStepper } from "@/components/ui/number-stepper";
 import {
   Form,
@@ -89,6 +90,7 @@ export function HabitForm({
       image: habit?.image || null as string | null,
       positive_motivation: habit?.positive_motivation || null as string | null,
       negative_motivation: habit?.negative_motivation || null as string | null,
+      notes: habit?.notes || "",
     },
   });
 
@@ -104,6 +106,7 @@ export function HabitForm({
         image: habit.image,
         positive_motivation: habit.positive_motivation,
         negative_motivation: habit.negative_motivation,
+        notes: habit.notes || "",
       });
 
       setDialogOpen(true);
@@ -139,6 +142,7 @@ export function HabitForm({
         image: null,
         positive_motivation: null,
         negative_motivation: null,
+        notes: "",
       });
       setNoRewards(false);
       setSelectedRewards([]);
@@ -163,6 +167,7 @@ export function HabitForm({
             image: values.image,
             positive_motivation: values.positive_motivation,
             negative_motivation: values.negative_motivation,
+            notes: values.notes?.trim() || null,
           })
           .eq("id", habit.id)
           .select()
@@ -182,6 +187,7 @@ export function HabitForm({
             image: values.image,
             positive_motivation: values.positive_motivation,
             negative_motivation: values.negative_motivation,
+            notes: values.notes?.trim() || null,
             user_id: user!.id,
           })
           .select()
@@ -576,6 +582,24 @@ export function HabitForm({
                   )}
                 />
               </div>
+
+              <FormField
+                control={form.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Notes</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Optional notes about this habit (tips, rules, context...)"
+                        rows={3}
+                        {...field}
+                        value={field.value ?? ""}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
 
               <div className="space-y-4">
                 <div className="flex justify-between items-center">

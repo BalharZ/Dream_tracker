@@ -18,7 +18,7 @@
 - [x] S7  Dashboard — rychlé plnění zvyků + rychlý výběr odměn ✅
 - [x] S8  Jednotky — dědění z cíle + čas v minutách ✅
 - [x] S9  (DB) Demo presety muž/žena + smazání dema ✅
-- [ ] S10 (DB) Poznámky ke zvykům
+- [x] S10 (DB) Poznámky ke zvykům ✅
 - [ ] S11 (DB) Více odměn jednoho typu na těžší zvyk
 - [ ] S12 (DB) Snowball / postupně rostoucí zvyky + podcviky
 - [ ] S13 (DB) Shluky zvyků AND/OR + eskalace
@@ -182,6 +182,12 @@
 **DB:** `notes text` na `habits` (nebo tabulka `habit_notes`).
 **Pokrývá body:** sekce poznámek u zvyku.
 **Ověření:** poznámku lze uložit a zobrazit u zvyku.
+
+✅ **Hotovo (2026-06-11)** — **SQL APLIKOVÁNO** (Claude přes Chrome extension přímo v Supabase SQL editoru, projekt Dream Tracker): `supabase/sql/S10_habit_notes.sql` — `alter table public.habits add column if not exists notes text;` (idempotentní); sloupec ověřen dotazem do `information_schema.columns` → `notes | text | nullable`.
+1. **`shared/schema.ts`:** `notes: string | null` přidáno do typu `Habit`.
+2. **`habit-form.tsx`:** nové pole „Notes" (Textarea, 3 řádky, volitelné) mezi Frequency/Color a sekcí Rewards; hodnota je v defaultValues i obou resetech (edit/nový) a ukládá se při insert i update (`trim()`, prázdno → `null`).
+3. **`habits-page.tsx`:** v tabulce History se u zvyku s poznámkou zobrazí ikona lístečku (StickyNote) vedle názvu s tooltippem (plný text v `title`) — záměrně jen ikona, aby se nerozhodilo zarovnání řádků levého a pravého sloupce tabulky. Plný text poznámky se zobrazuje v dialogu zápisu progresu (`EditProgressDialog`) pod datem/targetem (rámeček, `whitespace-pre-line`).
+**Ověřeno:** SQL spuštěno a sloupec potvrzen v DB; `tsc --noEmit` bez chyb; dev server (Vite) po reloadu renderuje login bez chyb v konzoli. Funkční scénář (uložit poznámku ve formuláři zvyku → ikona v tabulce + text v dialogu dne) je za přihlášením + Supabase daty — k ručnímu doověření majitelem dle kroků výše.
 
 ### S11 — (DB) Více odměn jednoho typu na těžší zvyk
 **Soubory:** `habit-form.tsx`, ruleta v `habits-page.tsx`, `shared/schema.ts`

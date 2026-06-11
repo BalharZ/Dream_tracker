@@ -37,6 +37,7 @@ export type Habit = {
   positive_motivation: string | null;
   negative_motivation: string | null;
   image: string | null;
+  notes: string | null;
   is_demo: boolean;
   created_at: string;
 };

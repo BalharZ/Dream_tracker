@@ -8,7 +8,7 @@ import { Habit, Goal, Reward } from "@shared/schema";
 import { supabase } from "@/lib/supabase";
 import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, StickyNote } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { HabitForm } from "@/components/habits/habit-form";
@@ -235,10 +235,10 @@ function HabitsPage() {
                       borderLeft: `4px solid ${habit.color}`
                     }}
                   >
-                    <div className="w-28 sm:w-48 px-3 py-3">
+                    <div className="w-28 sm:w-48 px-3 py-3 flex items-center gap-1 min-w-0">
                       <Button
                         variant="link"
-                        className="h-auto p-0 text-left"
+                        className="h-auto p-0 text-left min-w-0"
                         style={{ color: habit.color }}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -247,6 +247,15 @@ function HabitsPage() {
                       >
                         <div className="font-bold text-sm leading-tight truncate">{habit.name}</div>
                       </Button>
+                      {habit.notes && (
+                        <span
+                          title={habit.notes}
+                          aria-label="Habit notes"
+                          className="flex-shrink-0 text-muted-foreground"
+                        >
+                          <StickyNote className="h-3.5 w-3.5" />
+                        </span>
+                      )}
                     </div>
                     <div className="w-14 sm:w-20 px-2 py-3 flex flex-col items-center justify-center" style={{ color: habit.color }}>
                       <span className="text-base font-bold leading-tight">{habit.target_value}</span>
@@ -411,6 +420,12 @@ function EditProgressDialog({
               Target: {habit.target_value} {habit.unit}
             </span>
           </div>
+
+          {habit.notes && (
+            <p className="text-sm text-muted-foreground whitespace-pre-line border rounded-md p-2 bg-muted/50">
+              {habit.notes}
+            </p>
+          )}
 
           <div className="flex items-center space-x-2">
             <Input
