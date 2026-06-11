@@ -7,6 +7,7 @@ import { useForm } from "react-hook-form";
 import { useLocation } from "wouter";
 import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import type { DemoPreset } from "@/lib/seed-demo-data";
 
 export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
@@ -138,6 +139,7 @@ function LoginForm() {
 
 function RegisterForm() {
   const { registerMutation } = useAuth();
+  const [preset, setPreset] = useState<DemoPreset>("male");
   const form = useForm({
     defaultValues: {
       email: "",
@@ -147,7 +149,9 @@ function RegisterForm() {
 
   return (
     <form
-      onSubmit={form.handleSubmit((data) => registerMutation.mutate(data))}
+      onSubmit={form.handleSubmit((data) =>
+        registerMutation.mutate({ ...data, preset })
+      )}
       className="space-y-4 mt-4"
     >
       <div className="space-y-2">
@@ -168,6 +172,30 @@ function RegisterForm() {
           {...form.register("password")}
           placeholder="Choose a password (min 6 characters)"
         />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Starter examples</Label>
+        <div className="grid grid-cols-2 gap-2">
+          <Button
+            type="button"
+            variant={preset === "male" ? "default" : "outline"}
+            onClick={() => setPreset("male")}
+          >
+            For him
+          </Button>
+          <Button
+            type="button"
+            variant={preset === "female" ? "default" : "outline"}
+            onClick={() => setPreset("female")}
+          >
+            For her
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          We'll preload sample dreams, goals, habits and rewards so you can
+          explore the app. You can delete them anytime.
+        </p>
       </div>
 
       <Button

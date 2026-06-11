@@ -2,7 +2,7 @@ import { createContext, ReactNode, useContext, useEffect, useRef, useState } fro
 import { useMutation, UseMutationResult } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { queryClient } from "@/lib/queryClient";
-import { seedDemoData } from "@/lib/seed-demo-data";
+import { seedDemoData, type DemoPreset } from "@/lib/seed-demo-data";
 import { useToast } from "@/hooks/use-toast";
 import type { User } from "@supabase/supabase-js";
 
@@ -22,7 +22,7 @@ type AuthContextType = {
 };
 
 type LoginData = { email: string; password: string };
-type RegisterData = { email: string; password: string };
+type RegisterData = { email: string; password: string; preset: DemoPreset };
 
 function toAuthUser(user: User): AuthUser {
   const email = user.email ?? user.id;
@@ -107,7 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isRegisteringRef.current = false;
         throw new Error("Registration failed");
       }
-      await seedDemoData(data.user.id).catch(() => {});
+      await seedDemoData(data.user.id, credentials.preset).catch(() => {});
       isRegisteringRef.current = false;
       return toAuthUser(data.user);
     },

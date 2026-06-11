@@ -6,6 +6,7 @@ export type Dream = {
   positive_motivation: string | null;
   negative_motivation: string | null;
   progress: number;
+  is_demo: boolean;
   created_at: string;
 };
 
@@ -19,6 +20,7 @@ export type Goal = {
   progress: number;
   final_count: number;
   unit: string;
+  is_demo: boolean;
   created_at: string;
 };
 
@@ -35,6 +37,7 @@ export type Habit = {
   positive_motivation: string | null;
   negative_motivation: string | null;
   image: string | null;
+  is_demo: boolean;
   created_at: string;
 };
 
@@ -53,6 +56,7 @@ export type Reward = {
   name: string;
   image: string;
   available: number;
+  is_demo: boolean;
   created_at: string;
 };
 

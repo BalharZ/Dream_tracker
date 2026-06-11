@@ -17,7 +17,7 @@
 - [x] S6  Welcome + spodní mobilní navigace ✅
 - [x] S7  Dashboard — rychlé plnění zvyků + rychlý výběr odměn ✅
 - [x] S8  Jednotky — dědění z cíle + čas v minutách ✅
-- [ ] S9  (DB) Demo presety muž/žena + smazání dema
+- [x] S9  (DB) Demo presety muž/žena + smazání dema ✅ (čeká na spuštění SQL majitelem)
 - [ ] S10 (DB) Poznámky ke zvykům
 - [ ] S11 (DB) Více odměn jednoho typu na těžší zvyk
 - [ ] S12 (DB) Snowball / postupně rostoucí zvyky + podcviky
@@ -169,6 +169,13 @@
 **DB:** přidat `is_demo boolean default false` do `dreams/goals/habits/rewards`.
 **Pokrývá body:** bohatší demo presety (muž/žena: dům, postava, projekt, cvičení) s více sny/cíli; tlačítko „Smazat demo data" (maže jen `is_demo=true`).
 **Ověření:** nový účet dostane bohaté demo; tlačítko smaže pouze demo a schová se.
+
+✅ **Hotovo (2026-06-11)** — **⚠️ NEJDŘÍV SPUSTIT SQL:** `supabase/sql/S9_demo_is_demo.sql` vložit do Supabase SQL editoru a spustit (idempotentní; přidá `is_demo` do dreams/goals/habits/rewards + zpětně označí staré demo řádky podle demo obrázků). Bez SQL: registrace funguje, ale demo se nenaseeduje (chyba se jen zaloguje) a tlačítko mazání se nezobrazí.
+1. **Presety (`src/lib/seed-demo-data.ts`):** kompletní přepis na datově řízené presety `male`/`female` — každý 3 sny (dům/bydlení, postava/cvičení, vlastní projekt), každý sen s cílem a 1–2 zvyky, + 4 odměny s `habit_chances` na zvyky (~50 % no-reward na zvyk). Vše `is_demo: true`. Obrázky: stávající demo ze Storage + 8 ověřených Unsplash URL (všechny otestovány, že se načtou).
+2. **Výběr presetu při registraci (`auth-page.tsx`, `use-auth.tsx`):** v registračním formuláři přepínač „Starter examples: For him / For her" (default For him) + popisek; `RegisterData` nese `preset` a předá ho `seedDemoData`.
+3. **Smazání dema:** nový `src/lib/delete-demo-data.ts` (`hasDemoData`, `deleteDemoData` — maže v FK-safe pořadí: habit_progress demo zvyků → rewards → habits → goals → dreams, jen `is_demo=true`; pak `recomputeProgress`). Nový banner `src/components/demo/delete-demo-banner.tsx` na dashboardu (`home-page.tsx`) — zobrazí se jen když demo existuje, tlačítko „Delete demo data" s potvrzovacím AlertDialogem, po smazání invalidace queries → banner sám zmizí. Když sloupec `is_demo` ještě neexistuje, banner se prostě nezobrazí (žádný crash).
+4. **`shared/schema.ts`:** `is_demo: boolean` přidán do `Dream`, `Goal`, `Habit`, `Reward`.
+**Ověřeno:** `tsc --noEmit` bez chyb; v preview registrační formulář ukazuje přepínač a přepíná bez chyb v konzoli; všech 8 nových Unsplash obrázků reálně načteno (test v prohlížeči). Funkční scénář (registrace nového účtu → bohaté demo; smazání dema → zmizí jen demo + banner) vyžaduje nejdřív spustit SQL → k doověření majitelem.
 
 ### S10 — (DB) Poznámky ke zvykům
 **Soubory:** `habit-form.tsx`, `habits-page.tsx`, `shared/schema.ts`

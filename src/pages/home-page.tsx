@@ -9,6 +9,7 @@ import { Star, Target } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TodayHabits } from "@/components/habits/today-habits";
 import { QuickRewards } from "@/components/rewards/quick-rewards";
+import { DeleteDemoBanner } from "@/components/demo/delete-demo-banner";
 
 export default function HomePage() {
   const { user } = useAuth();
@@ -41,6 +42,8 @@ export default function HomePage() {
           Track your progress and achieve your dreams
         </p>
       </div>
+
+      <DeleteDemoBanner />
 
       <TodayHabits />
 
