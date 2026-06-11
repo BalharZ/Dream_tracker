@@ -16,7 +16,7 @@
 - [x] S5  Progres — kaskáda habit → goal → dream ✅
 - [x] S6  Welcome + spodní mobilní navigace ✅
 - [x] S7  Dashboard — rychlé plnění zvyků + rychlý výběr odměn ✅
-- [ ] S8  Jednotky — dědění z cíle + čas v minutách
+- [x] S8  Jednotky — dědění z cíle + čas v minutách ✅
 - [ ] S9  (DB) Demo presety muž/žena + smazání dema
 - [ ] S10 (DB) Poznámky ke zvykům
 - [ ] S11 (DB) Více odměn jednoho typu na těžší zvyk
@@ -152,6 +152,14 @@
 **Pokrývá body:** jednotka z cíle se propíše do podcílů; při tvorbě zvyku napojeného na cíl se jednotka přebere; je-li jednotka časová (hodiny), umožnit zvolit minuty (s převodem).
 **Úkoly:** podcíle dědí `unit` z cíle; v habit-form při výběru cíle předvyplnit `unit`; u časových jednotek nabídnout přepínač hodiny/minuty a správně přepočítat vůči cíli.
 **Ověření:** podcíl zdědí jednotku; zvyk napojený na cíl „hodiny" jde zadávat v minutách a sčítá se správně.
+
+✅ **Hotovo (2026-06-11)** — nový `src/lib/units.ts` + úpravy `src/lib/progress.ts`, `src/pages/goals-page.tsx`, `src/components/habits/habit-form.tsx`:
+1. **Helper jednotek `units.ts`:** detekce časových jednotek (hodiny/minuty, EN i CZ varianty: h/hr/hours/hod/hodiny…, min/minutes/minuty…), `timeAltUnit` (komplementární jednotka), `sameTimeUnit` a `conversionFactor` (min→h = 1/60, h→min = 60, jinak 1).
+2. **Dědění jednotky u podcílů (goals-page):** pole „Unit" u podcíle odstraněno — místo něj se zobrazuje jednotka hlavního cíle (read-only, živě přes `form.watch("unit")`). Při uložení dostanou všechny podcíle `unit` hlavního cíle (update i insert). Stav podcílů už `unit` nedrží.
+3. **Předvyplnění jednotky ve zvyku (habit-form):** při výběru cíle v selektoru se `unit` zvyku automaticky nastaví na jednotku cíle (jde dál přepsat; „no goal" jednotku nemění).
+4. **Čas v minutách:** je-li jednotka napojeného cíle časová, místo textového pole se zobrazí přepínač dvou tlačítek — jednotka cíle vs. komplementární („hodiny" ↔ „minutes"). Při volbě odlišné jednotky se ukáže popisek „Entries are converted to {jednotka cíle} for goal progress (60 min = 1 h)".
+5. **Správné sčítání (progress.ts):** příspěvek zvyku k cíli se před přičtením násobí `conversionFactor(habit.unit, goal.unit)` — zvyk v minutách na cíl v hodinách se počítá /60 (a obráceně ×60); nečasové jednotky beze změny.
+**Ověřeno:** `tsc --noEmit` bez chyb; dev server (Vite) běží bez chyb v server logu i konzoli, login se renderuje čistě. Funkční scénář (podcíl zdědí jednotku; zvyk na cíl „hodiny" zadávaný v minutách se správně sčítá) je za přihlášením + Supabase daty — k ručnímu doověření majitelem dle kroků výše.
 
 ---
 > **Níže potřebují SQL v Supabase (přístup přes Chrome extension). U každé session Claude nejdřív připraví SQL k vložení do Supabase SQL editoru, pak teprve kód.**

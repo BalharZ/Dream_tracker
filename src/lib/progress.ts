@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { conversionFactor } from "@/lib/units";
 import type { Goal, Habit, HabitProgress } from "@shared/schema";
 
 /**
@@ -39,11 +40,14 @@ export async function recomputeProgress(userId: string): Promise<void> {
     fulfilledByHabit.set(p.habit_id, (fulfilledByHabit.get(p.habit_id) || 0) + (p.value || 0));
   }
 
-  // Sum of habit contributions per goal.
+  // Sum of habit contributions per goal, converted into the goal's unit
+  // when the habit tracks a different time unit (e.g. minutes vs hours).
+  const goalById = new Map(goals.map((g) => [g.id, g]));
   const fulfilledByGoal = new Map<number, number>();
   for (const h of habits) {
     if (h.goal_id == null) continue;
-    const contribution = fulfilledByHabit.get(h.id) || 0;
+    const factor = conversionFactor(h.unit, goalById.get(h.goal_id)?.unit);
+    const contribution = (fulfilledByHabit.get(h.id) || 0) * factor;
     fulfilledByGoal.set(h.goal_id, (fulfilledByGoal.get(h.goal_id) || 0) + contribution);
   }
 

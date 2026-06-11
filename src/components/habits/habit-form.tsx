@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/select";
 import { Edit, Gift, Loader2, PlusCircle, X, Image as ImageIcon } from "lucide-react";
 import { ImageGallery } from "@/components/images/image-gallery";
+import { conversionFactor, isTimeUnit, sameTimeUnit, timeAltUnit } from "@/lib/units";
 
 export function HabitForm({
   goals,
@@ -400,7 +401,11 @@ export function HabitForm({
                         if (value === "no-goal") {
                           field.onChange(undefined);
                         } else {
-                          field.onChange(parseInt(value));
+                          const goalId = parseInt(value);
+                          field.onChange(goalId);
+                          // Inherit the unit from the selected goal.
+                          const selected = goals?.find((g) => g.id === goalId);
+                          if (selected?.unit) form.setValue("unit", selected.unit);
                         }
                       }}
                       value={field.value?.toString() || "no-goal"}
@@ -470,14 +475,46 @@ export function HabitForm({
                 <FormField
                   control={form.control}
                   name="unit"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Unit</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g. minutes, times" {...field} />
-                      </FormControl>
-                    </FormItem>
-                  )}
+                  render={({ field }) => {
+                    const selectedGoal = goals?.find((g) => g.id === form.watch("goal_id"));
+                    const goalUnit = selectedGoal?.unit;
+                    // Time-unit goal (hours/minutes): offer a toggle between the
+                    // goal's unit and the complementary one instead of free text.
+                    if (goalUnit && isTimeUnit(goalUnit)) {
+                      const altUnit = timeAltUnit(goalUnit)!;
+                      return (
+                        <FormItem>
+                          <FormLabel>Unit</FormLabel>
+                          <div className="flex gap-2">
+                            {[goalUnit, altUnit].map((u) => (
+                              <Button
+                                key={u}
+                                type="button"
+                                variant={sameTimeUnit(field.value, u) ? "default" : "outline"}
+                                className="flex-1"
+                                onClick={() => field.onChange(u)}
+                              >
+                                {u}
+                              </Button>
+                            ))}
+                          </div>
+                          {conversionFactor(field.value, goalUnit) !== 1 && (
+                            <p className="text-xs text-muted-foreground">
+                              Entries are converted to {goalUnit} for goal progress (60 min = 1 h).
+                            </p>
+                          )}
+                        </FormItem>
+                      );
+                    }
+                    return (
+                      <FormItem>
+                        <FormLabel>Unit</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g. minutes, times" {...field} />
+                        </FormControl>
+                      </FormItem>
+                    );
+                  }}
                 />
               </div>
 

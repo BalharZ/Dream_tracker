@@ -200,14 +200,15 @@ function AddGoalForm({ dreams, goals, goal, onSuccess }: {
   dreams: Dream[]; goals: Goal[]; goal?: Goal | null; onSuccess: () => void;
 }) {
   const { user } = useAuth();
-  const [subgoals, setSubgoals] = useState<{ name: string; final_count: number | string; unit: string; id?: number }[]>([]);
+  // Subgoals inherit the unit from the parent goal, so no per-subgoal unit state.
+  const [subgoals, setSubgoals] = useState<{ name: string; final_count: number | string; id?: number }[]>([]);
 
   useEffect(() => {
     if (goal) {
       const existing = goals
         .filter(g => g.parent_goal_id === goal.id)
         .sort((a, b) => a.id - b.id)
-        .map(g => ({ name: g.name, final_count: g.final_count, unit: g.unit, id: g.id }));
+        .map(g => ({ name: g.name, final_count: g.final_count, id: g.id }));
       setSubgoals(existing);
     }
   }, [goal, goals]);
@@ -261,13 +262,13 @@ function AddGoalForm({ dreams, goals, goal, onSuccess }: {
         const sgFinal = parseFloat(String(sg.final_count)) || 0;
         if (sg.id) {
           const { error } = await supabase.from("goals").update({
-            name: sg.name, dream_id: values.dream_id, final_count: sgFinal, unit: sg.unit,
+            name: sg.name, dream_id: values.dream_id, final_count: sgFinal, unit: values.unit,
           }).eq("id", sg.id);
           if (error) throw error;
         } else {
           const { error } = await supabase.from("goals").insert({
             user_id: user!.id, name: sg.name, dream_id: values.dream_id, parent_goal_id: goalId,
-            image: "placeholder.jpg", final_count: sgFinal, unit: sg.unit,
+            image: "placeholder.jpg", final_count: sgFinal, unit: values.unit,
           });
           if (error) throw error;
         }
@@ -332,7 +333,7 @@ function AddGoalForm({ dreams, goals, goal, onSuccess }: {
             <div key={sg.id ?? `new-${i}`} className="grid grid-cols-12 gap-2 py-2 border-t items-center">
               <div className="col-span-5"><Input placeholder="Subgoal name" value={sg.name} onChange={(e) => { const n = [...subgoals]; n[i] = { ...n[i], name: e.target.value }; setSubgoals(n); }} /></div>
               <div className="col-span-3"><Input type="number" min="1" placeholder="Count" value={sg.final_count} onChange={(e) => { const n = [...subgoals]; n[i] = { ...n[i], final_count: e.target.value === '' ? '' : (parseFloat(e.target.value) || 0) }; setSubgoals(n); }} /></div>
-              <div className="col-span-3"><Input placeholder="Unit" value={sg.unit} onChange={(e) => { const n = [...subgoals]; n[i] = { ...n[i], unit: e.target.value }; setSubgoals(n); }} /></div>
+              <div className="col-span-3 flex items-center px-1 text-sm text-muted-foreground truncate" title="Unit is inherited from the goal">{form.watch("unit") || "—"}</div>
               <div className="col-span-1 text-center"><Button type="button" variant="ghost" size="icon" onClick={() => { const n = [...subgoals]; n.splice(i, 1); setSubgoals(n); }} className="text-destructive h-8 w-8"><Trash2 className="h-4 w-4" /></Button></div>
             </div>
           ))}
@@ -344,7 +345,7 @@ function AddGoalForm({ dreams, goals, goal, onSuccess }: {
             </div>
           )}
           <div className="pt-3">
-            <Button type="button" variant="outline" size="sm" className="w-full" onClick={() => setSubgoals([...subgoals, { name: "", final_count: 100, unit: form.getValues("unit") || "" }])}>
+            <Button type="button" variant="outline" size="sm" className="w-full" onClick={() => setSubgoals([...subgoals, { name: "", final_count: 100 }])}>
               <Plus className="h-4 w-4 mr-2" />Add Subgoal
             </Button>
           </div>
