@@ -22,7 +22,7 @@
 - [x] S11 (DB) Více odměn jednoho typu na těžší zvyk ✅
 - [x] S12 (DB) Snowball / postupně rostoucí zvyky + podcviky ✅
 - [x] S13 (DB) Shluky zvyků AND/OR + eskalace ✅
-- [ ] S14 (DB) Celkový progres + upevnění zvyku (21 dní)
+- [x] S14 (compute) Celkový progres + upevnění zvyku (21 dní) ✅
 - [ ] S15 (DB) Kalendář + export do Google/Apple
 - [ ] S16 (DB/infra) Push notifikace + čas u zvyku + obsah z snu
 - [ ] S17 (native) Widget na plochu telefonu
@@ -236,6 +236,12 @@
 **Pokrývá body:** celkový progres napříč; „zvyk upevněn" po 21 dnech v řadě.
 **Úkoly:** detekce série (streak) z `habit_progress`; indikátor upevnění; agregovaný progres. (Možná bez DB, jen výpočet.)
 **Ověření:** 21 dní v řadě → zvyk označen jako upevněný; celkový progres sedí.
+
+✅ **Hotovo (2026-06-12)** — **BEZ SQL** (čistý výpočet z existujících `habit_progress` řádků). Nový `src/lib/streaks.ts` + úpravy `src/pages/habits-page.tsx`, `src/pages/home-page.tsx`:
+1. **`src/lib/streaks.ts`:** `CONSOLIDATION_DAYS = 21`; `computeStreak(habit, valuesByDate)` — počet po sobě jdoucích dní (konče dneškem; nedokončený dnešek sérii nepřeruší, jen se zatím nepočítá — začíná se od včerejška), kdy denní hodnota ≥ aktuální `target_value` (guard: target ≤ 0 → bere se 1); `isConsolidated(streak)` = streak ≥ 21. Tvrdý strop 3650 iterací. Streak je po dnech dle zadání („21 dní v řadě") — u weekly/monthly zvyků tedy upevnění prakticky nenastane, počítá se s daily.
+2. **`habits-page.tsx` (History tabulka):** vedle názvu zvyku inline indikátor — **plamínek (Flame, oranžový) + počet dní** při běžící sérii, **medaile (Medal, zlatá) + počet** při upevnění (≥ 21); plný popis v `title` tooltipu. Záměrně jedna řádka (jako ikona poznámky z S10), aby se nerozhodilo zarovnání řádků levého a pravého sloupce.
+3. **`home-page.tsx` (dashboard):** nová karta **„Overall Progress"** nahoře (pod demo bannerem) — progress bar + velké % = **průměr progress všech snů**; pod tím „Average across N dreams" a řádek s medailí „**X of Y habits consolidated (21+ days in a row)**" (stejný filtr zvyků jako na habits-page — zvyky s neexistujícím cílem se nepočítají). Přidány queries `habits` + `habit_progress_all` (jen `habit_id, date, value`).
+**Ověřeno:** `tsc --noEmit` bez chyb; dev server (Vite) po HMR bez chyb v server logu, app se renderuje čistě (login). Funkční scénář (zvyk se sérií ukáže plamínek + počet; po 21 dnech v řadě medaili a započítá se do „consolidated" na dashboardu; celkový progres = průměr snů) je za přihlášením + Supabase daty — k ručnímu doověření majitelem.
 
 ### S15 — (DB) Kalendář + export do Google/Apple
 **Soubory:** nová stránka kalendáře + route, `shared/schema.ts`

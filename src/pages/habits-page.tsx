@@ -8,7 +8,7 @@ import { Habit, HabitSubitem, Goal, Reward } from "@shared/schema";
 import { supabase } from "@/lib/supabase";
 import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
-import { Check, ChevronRight, StickyNote, TrendingUp } from "lucide-react";
+import { Check, ChevronRight, Flame, Medal, StickyNote, TrendingUp } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { HabitForm } from "@/components/habits/habit-form";
@@ -17,6 +17,7 @@ import { RewardRoulette } from "@/components/habits/reward-roulette";
 import { recomputeProgress } from "@/lib/progress";
 import { applySnowballGrowth } from "@/lib/snowball";
 import { buildUnits, countDoneUnits, isUnitDone, escalationDue, snoozeEscalation } from "@/lib/habit-clusters";
+import { computeStreak, isConsolidated, CONSOLIDATION_DAYS } from "@/lib/streaks";
 
 type ProgressMap = Record<number, Record<string, number>>;
 
@@ -241,7 +242,9 @@ function HabitsPage() {
                   if (!habit.goal_id) return true;
                   const goalExists = goals?.some(goal => goal.id === habit.goal_id);
                   return goalExists;
-                }).map((habit) => (
+                }).map((habit) => {
+                  const streak = computeStreak(habit, progressMap[habit.id] || {});
+                  return (
                   <div
                     key={habit.id}
                     className="flex border-b"
@@ -262,6 +265,25 @@ function HabitsPage() {
                       >
                         <div className="font-bold text-sm leading-tight truncate">{habit.name}</div>
                       </Button>
+                      {isConsolidated(streak) ? (
+                        <span
+                          title={`Habit consolidated — ${streak} days in a row (${CONSOLIDATION_DAYS}+ needed)`}
+                          aria-label="Habit consolidated"
+                          className="flex-shrink-0 flex items-center gap-0.5 text-amber-500"
+                        >
+                          <Medal className="h-3.5 w-3.5" />
+                          <span className="text-[10px] font-semibold leading-none">{streak}</span>
+                        </span>
+                      ) : streak > 0 ? (
+                        <span
+                          title={`Streak: ${streak} day${streak === 1 ? "" : "s"} in a row — consolidated at ${CONSOLIDATION_DAYS}`}
+                          aria-label={`Streak ${streak} days`}
+                          className="flex-shrink-0 flex items-center gap-0.5 text-orange-500"
+                        >
+                          <Flame className="h-3.5 w-3.5" />
+                          <span className="text-[10px] font-semibold leading-none">{streak}</span>
+                        </span>
+                      ) : null}
                       {habit.notes && (
                         <span
                           title={habit.notes}
@@ -285,7 +307,8 @@ function HabitsPage() {
                       <span className="text-[10px] leading-tight">{habit.unit}</span>
                     </div>
                   </div>
-                ))}
+                );
+                })}
               </div>
 
               {/* Scrollable right: Date columns */}
