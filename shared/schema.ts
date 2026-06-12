@@ -99,6 +99,19 @@ export type Reward = {
   created_at: string;
 };
 
+// Calendar event: date + optional times; start_time null = all-day event.
+// Times are Postgres `time` values ("HH:MM:SS"), date is "YYYY-MM-DD".
+export type CalendarEvent = {
+  id: number;
+  user_id: string;
+  title: string;
+  description: string | null;
+  date: string;
+  start_time: string | null;
+  end_time: string | null;
+  created_at: string;
+};
+
 // Value per habit: either a plain number (legacy format = win chance in %,
 // quantity 1) or an object with the chance and how many pieces of the reward
 // a single win grants (e.g. 5× "1 h of gaming" for a harder habit).

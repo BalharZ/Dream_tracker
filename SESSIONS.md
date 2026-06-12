@@ -23,7 +23,7 @@
 - [x] S12 (DB) Snowball / postupně rostoucí zvyky + podcviky ✅
 - [x] S13 (DB) Shluky zvyků AND/OR + eskalace ✅
 - [x] S14 (compute) Celkový progres + upevnění zvyku (21 dní) ✅
-- [ ] S15 (DB) Kalendář + export do Google/Apple
+- [x] S15 (DB) Kalendář + export do Google/Apple ✅
 - [ ] S16 (DB/infra) Push notifikace + čas u zvyku + obsah z snu
 - [ ] S17 (native) Widget na plochu telefonu
 
@@ -248,6 +248,13 @@
 **DB:** tabulka `events`.
 **Pokrývá body:** podstránka kalendáře (à la Google) s plány; tlačítko pro export události do Google/Apple kalendáře (nejjednodušší: generování `.ics`).
 **Ověření:** událost jde vytvořit, zobrazit v kalendáři a vyexportovat (.ics / Google).
+
+✅ **Hotovo (2026-06-12)** — **SQL APLIKOVÁNO** (Claude přes Chrome extension přímo v Supabase SQL editoru, projekt Dream Tracker): `supabase/sql/S15_events.sql` — tabulka `public.events` (id, user_id, title, description, date, start_time, end_time, created_at; `start_time` null = celodenní), index `(user_id, date)`, RLS „Users manage own events". Schéma ověřeno dotazem do `information_schema.columns` přímo po spuštění (8 sloupců přesně dle návrhu).
+1. **`shared/schema.ts`:** nový typ `CalendarEvent`.
+2. **`src/lib/ics.ts`:** export helpery — `buildIcs`/`downloadIcs` (RFC 5545 VCALENDAR, escaping, CRLF; celodenní `VALUE=DATE` s exkluzivním koncem, časované jako floating local time; chybějící konec = start + 1 h) a `googleCalendarUrl` (předvyplněný odkaz `calendar.google.com/render?action=TEMPLATE`).
+3. **`src/pages/calendar-page.tsx`:** nová stránka — měsíční mřížka à la Google (pondělí první, 6 řádků, sousední měsíce ztlumené, dnešek zvýrazněný kroužkem; na desktopu až 2 chipy událostí + „+N more", na mobilu tečky), navigace ←/→/Today, klik na den vybere den a dole zobrazí seznam událostí. Dialog Nová/Editace události: titulek, datum, přepínač All-day, start/end čas, popis; validace (titulek, datum, čas u nečasované). U každé události tlačítka: **Google** (otevře předvyplněný Google Calendar), **.ics** (stáhne soubor pro Apple/Outlook), Edit, Delete; nahoře **„Export all"** (.ics se všemi událostmi).
+4. **Route + navigace:** `/calendar` v `App.tsx`, položka „Calendar" (CalendarDays) v desktop sidebaru i mobilní spodní liště (`main-layout.tsx`).
+**Ověřeno:** SQL spuštěno a schéma potvrzeno v DB; `tsc --noEmit` bez chyb; dev server (Vite) renderuje login bez chyb v konzoli i server logu. Funkční scénář (vytvořit událost → vidět ji v mřížce + v seznamu dne → stáhnout .ics / otevřít Google odkaz) je za přihlášením + Supabase daty — k ručnímu doověření majitelem dle kroků výše.
 
 ### S16 — (DB/infra) Push notifikace + čas u zvyku + obsah z snu
 **Soubory:** service worker (PWA), `shared/schema.ts`, habit-form, Supabase Edge Function/cron

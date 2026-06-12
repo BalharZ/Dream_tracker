@@ -9,6 +9,7 @@ import {
   Repeat2,
   Gift,
   Trophy,
+  CalendarDays,
   LogOut,
 } from "lucide-react";
 
@@ -18,6 +19,7 @@ const navigation = [
   { name: "Goals", href: "/goals", icon: Target },
   { name: "Rewards", href: "/rewards", icon: Gift },
   { name: "Habits", href: "/habits", icon: Repeat2 },
+  { name: "Calendar", href: "/calendar", icon: CalendarDays },
   { name: "Stash", href: "/stash", icon: Trophy },
 ];
 
