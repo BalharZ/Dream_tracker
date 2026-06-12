@@ -128,6 +128,15 @@ export type CalendarEvent = {
   created_at: string;
 };
 
+// Long-lived random token for the Android home-screen widget (one per user).
+// The widget authenticates RPC calls (widget_get_today / widget_complete_habit)
+// with it instead of a Supabase session.
+export type WidgetToken = {
+  user_id: string;
+  token: string;
+  created_at: string;
+};
+
 // Value per habit: either a plain number (legacy format = win chance in %,
 // quantity 1) or an object with the chance and how many pieces of the reward
 // a single win grants (e.g. 5× "1 h of gaming" for a harder habit).

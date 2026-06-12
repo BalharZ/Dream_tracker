@@ -25,7 +25,7 @@
 - [x] S14 (compute) Celkový progres + upevnění zvyku (21 dní) ✅
 - [x] S15 (DB) Kalendář + export do Google/Apple ✅
 - [x] S16 (DB/infra) Push notifikace + čas u zvyku + obsah z snu ✅
-- [ ] S17 (native) Widget na plochu telefonu
+- [x] S17 (native) Widget na plochu telefonu ✅
 
 ---
 
@@ -276,6 +276,13 @@
 **Soubory:** Capacitor projekt + nativní Android widget
 **Pokrývá body:** vyplnění zvyků z plochy bez otevření aplikace.
 **Ověření:** widget na ploše umožní zapsat splnění zvyku.
+
+✅ **Hotovo (2026-06-12)** — **SQL APLIKOVÁNO** (Claude přes Chrome extension přímo v Supabase SQL editoru, projekt Dream Tracker): `supabase/sql/S17_widget.sql` — tabulka `widget_tokens` (user_id PK → auth.users, token unique, RLS „Users manage own widget tokens") + dvě SECURITY DEFINER RPC funkce volatelné s anon klíčem: `widget_get_today(p_token)` (dnešní zvyky: id, name, target, unit, value, done; „dnešek" v Europe/Prague) a `widget_complete_habit(p_token, p_habit_id)` (nastaví dnešek na target: upsert `habit_progress` + update `habits.current_value` — stejný zápis jako „✓" v TodayHabits). Ověřeno reálným REST voláním: bogus token → 403 `{"code":"28000","message":"invalid widget token"}` (= funkce nasazené a anon je smí volat).
+1. **Capacitor projekt (v6 — záměrně, sedí na JDK 17 + Android SDK platform 34 nainstalované na stroji; v7 chce Javu 21):** `capacitor.config.ts` (appId `com.dreamtracker.app`, webDir `dist`), `android/` vygenerován přes `npx cap add android`, web se bunduje do APK (žádná závislost na Vercel deploy). Závislosti: `@capacitor/core+android+preferences` + dev `@capacitor/cli`.
+2. **JS most `src/lib/widget-sync.ts`:** po loginu na nativní platformě zajistí widget token (select/insert do `widget_tokens`, 32 náhodných bytů hex) a zapíše `{url, anonKey, token}` do Capacitor Preferences (SharedPreferences `CapacitorStorage`, klíč `widget_cfg`), odkud ho čte nativní widget. Navíc volá `recomputeProgress` — zápisy z widgetu se tak promítnou do goals/dreams při každém otevření appky. Logout config maže (widget pak ukazuje „přihlas se"). Zapojeno v `use-auth.tsx` (useEffect na user.id + logout onSuccess); v prohlížeči je vše no-op. `shared/schema.ts`: nový typ `WidgetToken`.
+3. **Nativní widget (Java, `android/.../widget/`):** `HabitsWidgetProvider` (AppWidgetProvider) + `HabitsWidgetService` (RemoteViewsFactory; HTTP synchronně na binder threadu) + `WidgetApi` (čtení configu + PostgREST RPC přes HttpURLConnection) + layouty `widget_habits`/`widget_habit_item`, drawables (tmavé zaoblené pozadí, fialový kroužek / zelené ✓), `xml/widget_info.xml`, registrace v manifestu. Widget = ListView dnešních zvyků (název + „hodnota / target jednotka"), **tap na kroužek = splnit zvyk bez otevření appky** (broadcast → goAsync vlákno → `widget_complete_habit` → refresh listu), ⟳ = ruční refresh, tap na titulek/prázdný stav otevře appku, auto-update à 30 min. Pozn.: u zvyků s podcviky/snowball zapíše hlavní hodnotu = target (stejné chování jako rychlé „✓" na dashboardu).
+4. **APK zbuildováno:** `android/app/build/outputs/apk/debug/app-debug.apk` (4,4 MB; gradle `assembleDebug` BUILD SUCCESSFUL, 108 tasků). Rebuild po změnách webu: `npm run build; npx cap sync android; cd android; .\gradlew.bat assembleDebug` (env: `ANDROID_HOME=%LOCALAPPDATA%\Android\Sdk`, `JAVA_HOME=C:\Program Files\Microsoft\jdk-17`; `android/local.properties` s sdk.dir je vytvořen, gitignored).
+**Ověřeno:** `tsc --noEmit` bez chyb; web dev server renderuje login čistě (konzole bez chyb — widget kód je v prohlížeči neaktivní); gradle build prošel; SQL aplikováno a obě RPC otestovány přes REST. **Instalace na telefon (ruční krok majitele):** přenést `app-debug.apk` do telefonu → povolit instalaci z neznámých zdrojů → nainstalovat → otevřít „Dream Tracker" a přihlásit se (tím se widgetu předá token) → dlouhý stisk na ploše → Widgety → Dream Tracker → přidat. Pak tap na kroužek u zvyku zapíše splnění dneška rovnou z plochy; ověř v appce/na webu, že se den zapsal a po otevření appky se přepočítá progres cíle/snu.
 
 ---
 

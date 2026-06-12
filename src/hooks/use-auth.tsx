@@ -3,6 +3,7 @@ import { useMutation, UseMutationResult } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { queryClient } from "@/lib/queryClient";
 import { seedDemoData, type DemoPreset } from "@/lib/seed-demo-data";
+import { syncWidgetConfig, clearWidgetConfig } from "@/lib/widget-sync";
 import { useToast } from "@/hooks/use-toast";
 import type { User } from "@supabase/supabase-js";
 
@@ -70,6 +71,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
+  // S17: hand the Android home-screen widget its token/config (no-op in browser).
+  useEffect(() => {
+    if (user?.id) syncWidgetConfig(user.id);
+  }, [user?.id]);
+
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
       // Support old username-based accounts (e.g. "demo" → "demo@dreamtracker.app")
@@ -129,6 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     onSuccess: () => {
       queryClient.clear();
       setUser(null);
+      clearWidgetConfig();
     },
     onError: (error: Error) => {
       toast({ title: "Logout failed", description: error.message, variant: "destructive" });
