@@ -38,9 +38,16 @@ import { ImageGallery } from "@/components/images/image-gallery";
 import { conversionFactor, isTimeUnit, sameTimeUnit, timeAltUnit } from "@/lib/units";
 import { getChance, getQuantity, makeChanceEntry, parseHabitChances } from "@/lib/habit-chances";
 import { increaseSnowballNow } from "@/lib/snowball";
+import { escalationDue, snoozeEscalation } from "@/lib/habit-clusters";
 
 // Editable sub-exercise row; id is set for rows loaded from the DB.
-type SubitemDraft = { id?: number; name: string; target: number | string };
+// or_group: OR cluster number (null = required individually / AND).
+type SubitemDraft = {
+  id?: number;
+  name: string;
+  target: number | string;
+  or_group: number | null;
+};
 
 export function HabitForm({
   goals,
@@ -91,7 +98,12 @@ export function HabitForm({
   useEffect(() => {
     if (habit) {
       setSubitems(
-        (existingSubitems || []).map((s) => ({ id: s.id, name: s.name, target: s.target }))
+        (existingSubitems || []).map((s) => ({
+          id: s.id,
+          name: s.name,
+          target: s.target,
+          or_group: s.or_group ?? null,
+        }))
       );
     }
   }, [habit, existingSubitems]);
@@ -130,6 +142,7 @@ export function HabitForm({
       base_target: (habit?.base_target ?? 0) as number | string,
       step_value: (habit?.step_value ?? 1) as number | string,
       interval_days: (habit?.interval_days ?? 21) as number | string,
+      escalation_days: (habit?.escalation_days ?? 0) as number | string,
     },
   });
 
@@ -150,6 +163,7 @@ export function HabitForm({
         base_target: habit.base_target ?? 0,
         step_value: habit.step_value ?? 1,
         interval_days: habit.interval_days ?? 21,
+        escalation_days: habit.escalation_days ?? 0,
       });
 
       setDialogOpen(true);
@@ -186,6 +200,7 @@ export function HabitForm({
         base_target: 0,
         step_value: 1,
         interval_days: 21,
+        escalation_days: 0,
       });
       setNoRewards(false);
       setSelectedRewards([]);
@@ -202,6 +217,7 @@ export function HabitForm({
       const isSnow = values.habit_type === "snowball";
       const wasSnow = habit?.habit_type === "snowball";
       const todayStr = format(new Date(), "yyyy-MM-dd");
+      const escDays = values.escalation_days > 0 ? values.escalation_days : null;
       const basePayload = {
         name: values.name,
         unit: values.unit,
@@ -216,7 +232,19 @@ export function HabitForm({
         base_target: isSnow ? values.base_target : null,
         step_value: isSnow ? values.step_value : null,
         interval_days: isSnow ? values.interval_days : null,
+        escalation_days: escDays,
       };
+
+      // Adding a new sub-exercise while an escalation is due counts as the
+      // escalation itself, so the offer interval restarts automatically.
+      const addedSubitem = subitems.some((s) => !s.id && s.name.trim());
+      const escalationAnchor = !escDays
+        ? null
+        : !habit || !habit.escalation_days
+          ? todayStr // (re)enabled now → start the interval today
+          : escalationDue(habit) && addedSubitem
+            ? todayStr
+            : habit.last_escalation_at;
 
       if (habit) {
         const { data, error } = await supabase
@@ -231,6 +259,7 @@ export function HabitForm({
                 : values.base_target
               : values.target_value,
             last_increase_at: isSnow ? (wasSnow ? habit.last_increase_at : todayStr) : null,
+            last_escalation_at: escalationAnchor,
           })
           .eq("id", habit.id)
           .select()
@@ -244,6 +273,7 @@ export function HabitForm({
             ...basePayload,
             target_value: isSnow ? values.base_target : values.target_value,
             last_increase_at: isSnow ? todayStr : null,
+            last_escalation_at: escalationAnchor,
             user_id: user!.id,
           })
           .select()
@@ -262,6 +292,7 @@ export function HabitForm({
             name: s.name.trim(),
             target: Number.isFinite(target) && target > 0 ? target : 1,
             position: i,
+            or_group: s.or_group,
           };
         })
         .filter((s) => s.name);
@@ -278,7 +309,12 @@ export function HabitForm({
           subitemOps.push(
             supabase
               .from("habit_subitems")
-              .update({ name: s.name, target: s.target, position: s.position })
+              .update({
+                name: s.name,
+                target: s.target,
+                position: s.position,
+                or_group: s.or_group,
+              })
               .eq("id", s.id)
           );
         } else {
@@ -290,6 +326,7 @@ export function HabitForm({
               target: s.target,
               unit: "",
               position: s.position,
+              or_group: s.or_group,
             })
           );
         }
@@ -445,6 +482,29 @@ export function HabitForm({
     },
   });
 
+  // "Later" on a due escalation offer: restart the interval and close the
+  // dialog (the habit prop would be stale).
+  const snoozeEscalationNow = useMutation({
+    mutationFn: async () => snoozeEscalation(habit!.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["habits"] });
+      toast({
+        title: "Escalation snoozed",
+        description: `You'll be reminded again in ${habit?.escalation_days} days.`,
+      });
+      onSuccess();
+      setDialogOpen(false);
+    },
+    onError: (error) => {
+      console.error(error);
+      toast({
+        title: "Error!",
+        description: "Failed to snooze the escalation.",
+        variant: "destructive",
+      });
+    },
+  });
+
   // "Increase earlier" for snowball habits: bump the target right away and
   // restart the interval, then close the dialog (the habit prop would be stale).
   const increaseNow = useMutation({
@@ -519,6 +579,7 @@ export function HabitForm({
                   base_target: num(data.base_target),
                   step_value: num(data.step_value),
                   interval_days: Math.max(1, Math.round(num(data.interval_days, 21)) || 21),
+                  escalation_days: Math.max(0, Math.round(num(data.escalation_days, 0)) || 0),
                 });
               })}
               className="space-y-4"
@@ -840,7 +901,9 @@ export function HabitForm({
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => setSubitems((prev) => [...prev, { name: "", target: 1 }])}
+                    onClick={() =>
+                      setSubitems((prev) => [...prev, { name: "", target: 1, or_group: null }])
+                    }
                   >
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Add sub-exercise
@@ -877,6 +940,31 @@ export function HabitForm({
                           buttonClassName="h-9 w-9"
                           aria-label="Sub-exercise target"
                         />
+                        <Select
+                          value={s.or_group != null ? String(s.or_group) : "and"}
+                          onValueChange={(value) =>
+                            setSubitems((prev) =>
+                              prev.map((row, idx) =>
+                                idx === i
+                                  ? { ...row, or_group: value === "and" ? null : parseInt(value) }
+                                  : row
+                              )
+                            )
+                          }
+                        >
+                          <SelectTrigger
+                            className="h-9 w-20 shrink-0"
+                            aria-label="AND / OR group"
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="and">AND</SelectItem>
+                            <SelectItem value="1">OR 1</SelectItem>
+                            <SelectItem value="2">OR 2</SelectItem>
+                            <SelectItem value="3">OR 3</SelectItem>
+                          </SelectContent>
+                        </Select>
                         <Button
                           type="button"
                           variant="ghost"
@@ -892,12 +980,59 @@ export function HabitForm({
                       </div>
                     ))}
                     <p className="text-xs text-muted-foreground">
-                      Sub-exercises are filled one by one when logging a day. The day's
-                      habit value becomes the number of completed sub-exercises (a target
-                      of 1 works like a checkbox).
+                      Sub-exercises are filled one by one when logging a day. AND = required
+                      individually; rows sharing the same OR group form a cluster where
+                      completing any one of them counts (e.g. 5 push-ups OR 5 squats).
+                      The day's habit value becomes the number of completed items
+                      (AND rows + OR clusters), so set the target accordingly.
                     </p>
                   </div>
                 )}
+
+                <div className="space-y-2 border p-3 rounded-md">
+                  <FormField
+                    control={form.control}
+                    name="escalation_days"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Offer escalation every (days)</FormLabel>
+                        <FormControl>
+                          <NumberStepper
+                            min={0}
+                            value={field.value ?? ""}
+                            onChange={field.onChange}
+                          />
+                        </FormControl>
+                        <p className="text-xs text-muted-foreground">
+                          0 = off. After this many days the app offers to escalate the
+                          habit — add a new sub-exercise or tighten an OR group. Adding
+                          a sub-exercise restarts the countdown.
+                        </p>
+                      </FormItem>
+                    )}
+                  />
+                  {habit && escalationDue(habit) && (
+                    <div className="flex items-center justify-between gap-2 rounded-md border border-amber-400 bg-amber-50 dark:bg-amber-950/30 p-2">
+                      <span className="text-sm">
+                        Escalation is due — add a sub-exercise above or tighten an OR
+                        group, then save.
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="shrink-0"
+                        disabled={snoozeEscalationNow.isPending}
+                        onClick={() => snoozeEscalationNow.mutate()}
+                      >
+                        {snoozeEscalationNow.isPending ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : null}
+                        Later
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="space-y-4">

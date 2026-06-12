@@ -21,7 +21,7 @@
 - [x] S10 (DB) Poznámky ke zvykům ✅
 - [x] S11 (DB) Více odměn jednoho typu na těžší zvyk ✅
 - [x] S12 (DB) Snowball / postupně rostoucí zvyky + podcviky ✅
-- [ ] S13 (DB) Shluky zvyků AND/OR + eskalace
+- [x] S13 (DB) Shluky zvyků AND/OR + eskalace ✅
 - [ ] S14 (DB) Celkový progres + upevnění zvyku (21 dní)
 - [ ] S15 (DB) Kalendář + export do Google/Apple
 - [ ] S16 (DB/infra) Push notifikace + čas u zvyku + obsah z snu
@@ -223,6 +223,13 @@
 **DB:** model shluku (skupina podcviků s podmínkami OR/AND, eskalace v čase).
 **Pokrývá body:** splnění shluku přes OR (5 kliků NEBO 5 dřepů), postupné přidávání cviků, kombinace 1×AND + 1×OR.
 **Ověření:** shluk se vyhodnotí podle OR/AND; po čase se nabídne eskalace.
+
+✅ **Hotovo (2026-06-12)** — **SQL APLIKOVÁNO** (Claude přes Chrome extension přímo v Supabase SQL editoru, projekt Dream Tracker): `supabase/sql/S13_subitem_groups_escalation.sql` — `habit_subitems.or_group` (integer) + `habits.escalation_days` (integer) a `habits.last_escalation_at` (date); všechny 3 sloupce ověřeny dotazem do `information_schema.columns` přímo po spuštění.
+1. **Model shluků (`src/lib/habit-clusters.ts`):** podcvik má volitelné číslo **OR skupiny** (`or_group`); podcviky se stejným číslem tvoří shluk, ze kterého stačí splnit **jeden** (5 kliků NEBO 5 dřepů); podcviky bez skupiny jsou povinné samostatně (**AND**). Denní hodnota zvyku = počet splněných **jednotek** (jednotka = samostatný AND podcvik nebo celá OR skupina) → kombinace „1×AND + 1×OR" je prostě 1 řádek AND + 2 řádky ve skupině OR 1, target zvyku = 2. Helpery: `buildUnits`, `isUnitDone`, `countDoneUnits`, `escalationDue`, `snoozeEscalation`.
+2. **`habit-form.tsx`:** u každého podcviku nový selektor **AND / OR 1 / OR 2 / OR 3** (ukládá se při insert/update, načítá při editaci); popisek pod seznamem vysvětluje vyhodnocení a doporučený target. Nové pole **„Offer escalation every (days)"** (NumberStepper, 0 = vypnuto) — při zapnutí se kotva (`last_escalation_at`) nastaví na dnešek. **Přidání nového podcviku ve chvíli splatné eskalace automaticky restartuje interval** (přidání cviku = provedená eskalace). Při splatné eskalaci se ve formuláři zobrazí oranžový banner s tlačítkem „Later" (odložení = restart intervalu).
+3. **`habits-page.tsx` (`EditProgressDialog`):** podcviky se zobrazují po jednotkách — AND řádky samostatně, OR skupina v čárkovaném rámečku „OR group — complete any one" (zezelená po splnění libovolného člena). Hlavička „Target: N items" a počítadlo „Completed: X / N items" počítají jednotky (ne syrové podcviky). Při splatné eskalaci banner „Time to escalate…" s tlačítky **Later** (snooze) a **Escalate (edit habit)** (zavře dialog a otevře editaci zvyku). Eskalace je lazy (kontrola při otevření, žádný cron), vzor snowball z S12.
+4. **`shared/schema.ts`:** `HabitSubitem.or_group`, `Habit.escalation_days` + `Habit.last_escalation_at`.
+**Ověřeno:** SQL spuštěno a 3 sloupce potvrzeny v DB; `tsc --noEmit` bez chyb; dev server (Vite) renderuje login bez chyb v konzoli i server logu. Funkční scénář (zvyk s podcviky: 1×AND + 2×„OR 1" → den splněn při AND + libovolném z OR; po `escalation_days` dnech se v dialogu dne / editaci nabídne eskalace; „Later" odloží, přidání cviku restartuje interval) je za přihlášením + Supabase daty — k ručnímu doověření majitelem.
 
 ### S14 — (DB nebo compute) Celkový progres + upevnění zvyku (21 dní)
 **Soubory:** `src/lib/progress.ts` (z S5), dashboard, habits-page

@@ -16,6 +16,7 @@ import { NumberStepper } from "@/components/ui/number-stepper";
 import { RewardRoulette } from "@/components/habits/reward-roulette";
 import { recomputeProgress } from "@/lib/progress";
 import { applySnowballGrowth } from "@/lib/snowball";
+import { buildUnits, countDoneUnits, isUnitDone, escalationDue, snoozeEscalation } from "@/lib/habit-clusters";
 
 type ProgressMap = Record<number, Record<string, number>>;
 
@@ -396,6 +397,10 @@ function HabitsPage() {
             handleHabitProgress(selectedHabit.id, value, dateStr);
             setEditProgressDialogOpen(false);
           }}
+          onEditHabit={() => {
+            setEditProgressDialogOpen(false);
+            setHabitToEdit(selectedHabit);
+          }}
         />
       )}
     </div>
@@ -409,6 +414,7 @@ function EditProgressDialog({
   date,
   initialValue,
   onSave,
+  onEditHabit,
 }: {
   isOpen: boolean;
   onClose: () => void;
@@ -416,6 +422,7 @@ function EditProgressDialog({
   date: Date;
   initialValue: number;
   onSave: (value: number) => void;
+  onEditHabit?: () => void;
 }) {
   const [value, setValue] = useState<number | string>(initialValue > 0 ? initialValue : '');
   const dateStr = format(date, "yyyy-MM-dd");
@@ -474,9 +481,26 @@ function EditProgressDialog({
     const v = subValues[id];
     return typeof v === "string" ? Number(v) || 0 : v || 0;
   };
-  const doneCount = (subitems || []).filter(
-    (s) => subNumeric(s.id) >= (s.target || 1)
-  ).length;
+  // Units: standalone sub-exercises (AND) + OR clusters, each counting as 1.
+  const units = buildUnits(subitems || []);
+  const doneCount = countDoneUnits(units, subNumeric);
+
+  // Escalation offer (hidden locally after snoozing — the habit prop is stale
+  // until the habits query refetches).
+  const [escalationSnoozed, setEscalationSnoozed] = useState(false);
+  useEffect(() => {
+    setEscalationSnoozed(false);
+  }, [habit.id, isOpen]);
+  const showEscalation = escalationDue(habit) && !escalationSnoozed;
+  const handleSnoozeEscalation = async () => {
+    setEscalationSnoozed(true);
+    try {
+      await snoozeEscalation(habit.id);
+      queryClient.invalidateQueries({ queryKey: ["habits"] });
+    } catch (error) {
+      console.error("Error snoozing escalation:", error);
+    }
+  };
 
   const handleSave = async () => {
     if (hasSubitems) {
@@ -509,7 +533,9 @@ function EditProgressDialog({
               {format(date, "EEEE, MMMM d, yyyy")}
             </span>
             <span className="text-sm text-muted-foreground">
-              Target: {hasSubitems ? `${subitems!.length} sub-exercises` : `${habit.target_value} ${habit.unit}`}
+              Target: {hasSubitems
+                ? `${units.length} item${units.length === 1 ? "" : "s"}`
+                : `${habit.target_value} ${habit.unit}`}
             </span>
           </div>
 
@@ -526,55 +552,93 @@ function EditProgressDialog({
             </p>
           )}
 
+          {showEscalation && (
+            <div className="rounded-md border border-amber-400 bg-amber-50 dark:bg-amber-950/30 p-2 space-y-2">
+              <p className="text-sm">
+                Time to escalate <span className="font-medium">{habit.name}</span> —
+                consider adding a sub-exercise or tightening an OR group.
+              </p>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" size="sm" onClick={handleSnoozeEscalation}>
+                  Later
+                </Button>
+                {onEditHabit && (
+                  <Button size="sm" onClick={onEditHabit}>
+                    Escalate (edit habit)
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+
           {hasSubitems ? (
             <div className="space-y-2">
-              {subitems!.map((s) => {
-                const done = subNumeric(s.id) >= (s.target || 1);
+              {units.map((unit) => {
+                const renderRow = (s: HabitSubitem) => {
+                  const done = subNumeric(s.id) >= (s.target || 1);
+                  return (
+                    <div
+                      key={s.id}
+                      className="flex items-center gap-2 rounded-md border p-2"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-medium">{s.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          Target: {s.target} {s.unit}
+                        </div>
+                      </div>
+                      {(s.target || 1) > 1 && (
+                        <NumberStepper
+                          min={0}
+                          value={subValues[s.id] ?? 0}
+                          onChange={(v) =>
+                            setSubValues((prev) => ({ ...prev, [s.id]: v }))
+                          }
+                          className="w-32 shrink-0"
+                          inputClassName="h-9"
+                          buttonClassName="h-9 w-9"
+                          aria-label={`${s.name} value`}
+                        />
+                      )}
+                      <Button
+                        size="icon"
+                        variant={done ? "default" : "outline"}
+                        className="shrink-0"
+                        style={done ? { backgroundColor: habit.color } : undefined}
+                        onClick={() =>
+                          setSubValues((prev) => ({
+                            ...prev,
+                            [s.id]: done ? 0 : s.target || 1,
+                          }))
+                        }
+                        aria-label={`Toggle ${s.name} done`}
+                        title={done ? "Mark as not done" : "Mark as done"}
+                      >
+                        <Check className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  );
+                };
+
+                if (unit.kind === "single") return renderRow(unit.subitem);
+
+                const orDone = isUnitDone(unit, subNumeric);
                 return (
                   <div
-                    key={s.id}
-                    className="flex items-center gap-2 rounded-md border p-2"
+                    key={`or-${unit.group}`}
+                    className={`space-y-2 rounded-md border border-dashed p-2 ${
+                      orDone ? "border-green-500" : ""
+                    }`}
                   >
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-medium">{s.name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        Target: {s.target} {s.unit}
-                      </div>
-                    </div>
-                    {(s.target || 1) > 1 && (
-                      <NumberStepper
-                        min={0}
-                        value={subValues[s.id] ?? 0}
-                        onChange={(v) =>
-                          setSubValues((prev) => ({ ...prev, [s.id]: v }))
-                        }
-                        className="w-32 shrink-0"
-                        inputClassName="h-9"
-                        buttonClassName="h-9 w-9"
-                        aria-label={`${s.name} value`}
-                      />
-                    )}
-                    <Button
-                      size="icon"
-                      variant={done ? "default" : "outline"}
-                      className="shrink-0"
-                      style={done ? { backgroundColor: habit.color } : undefined}
-                      onClick={() =>
-                        setSubValues((prev) => ({
-                          ...prev,
-                          [s.id]: done ? 0 : s.target || 1,
-                        }))
-                      }
-                      aria-label={`Toggle ${s.name} done`}
-                      title={done ? "Mark as not done" : "Mark as done"}
-                    >
-                      <Check className="h-4 w-4" />
-                    </Button>
+                    <p className="text-xs font-medium text-muted-foreground">
+                      OR group — complete any one{orDone ? " ✓" : ""}
+                    </p>
+                    {unit.members.map(renderRow)}
                   </div>
                 );
               })}
               <p className="text-sm text-muted-foreground">
-                Completed: {doneCount} / {subitems!.length}
+                Completed: {doneCount} / {units.length} item{units.length === 1 ? "" : "s"}
               </p>
             </div>
           ) : (

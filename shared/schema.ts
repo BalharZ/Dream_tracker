@@ -47,11 +47,19 @@ export type Habit = {
   step_value: number | null;
   interval_days: number | null;
   last_increase_at: string | null;
+  // Escalation: every escalation_days days the app offers to escalate the
+  // habit (add a sub-exercise / tighten an OR group). last_escalation_at
+  // anchors the interval; null escalation_days = no escalation.
+  escalation_days: number | null;
+  last_escalation_at: string | null;
   created_at: string;
 };
 
 // Sub-exercise row under a habit (e.g. "Exercise" → push-ups / squats / sit-ups).
 // target 1 behaves like a checkbox; higher targets are filled with a counter.
+// or_group: sub-exercises sharing the same number form an OR cluster — doing
+// any one of them completes the whole cluster (5 push-ups OR 5 squats).
+// null = required individually (AND).
 export type HabitSubitem = {
   id: number;
   habit_id: number;
@@ -60,6 +68,7 @@ export type HabitSubitem = {
   target: number;
   unit: string;
   position: number;
+  or_group: number | null;
   created_at: string;
 };
 
