@@ -4,16 +4,18 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Habit, Goal, Reward } from "@shared/schema";
+import { Habit, HabitSubitem, Goal, Reward } from "@shared/schema";
 import { supabase } from "@/lib/supabase";
 import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
-import { ChevronRight, StickyNote } from "lucide-react";
+import { Check, ChevronRight, StickyNote, TrendingUp } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { HabitForm } from "@/components/habits/habit-form";
+import { NumberStepper } from "@/components/ui/number-stepper";
 import { RewardRoulette } from "@/components/habits/reward-roulette";
 import { recomputeProgress } from "@/lib/progress";
+import { applySnowballGrowth } from "@/lib/snowball";
 
 type ProgressMap = Record<number, Record<string, number>>;
 
@@ -34,6 +36,18 @@ function HabitsPage() {
     },
     enabled: !!user,
   });
+
+  // Lazily apply due snowball increases whenever habits load. A successful
+  // write invalidates the query; the refetched habits have nothing due, so
+  // this cannot loop.
+  useEffect(() => {
+    if (!habits || habits.length === 0) return;
+    applySnowballGrowth(habits)
+      .then((changed) => {
+        if (changed) queryClient.invalidateQueries({ queryKey: ["habits"] });
+      })
+      .catch((error) => console.error("Error applying snowball growth:", error));
+  }, [habits]);
 
   useEffect(() => {
     if (!habits || habits.length === 0) return;
@@ -258,7 +272,15 @@ function HabitsPage() {
                       )}
                     </div>
                     <div className="w-14 sm:w-20 px-2 py-3 flex flex-col items-center justify-center" style={{ color: habit.color }}>
-                      <span className="text-base font-bold leading-tight">{habit.target_value}</span>
+                      <span className="text-base font-bold leading-tight flex items-center gap-0.5">
+                        {habit.target_value}
+                        {habit.habit_type === "snowball" && (
+                          <TrendingUp
+                            className="h-3 w-3"
+                            aria-label="Snowball habit"
+                          />
+                        )}
+                      </span>
                       <span className="text-[10px] leading-tight">{habit.unit}</span>
                     </div>
                   </div>
@@ -396,6 +418,7 @@ function EditProgressDialog({
   onSave: (value: number) => void;
 }) {
   const [value, setValue] = useState<number | string>(initialValue > 0 ? initialValue : '');
+  const dateStr = format(date, "yyyy-MM-dd");
 
   useEffect(() => {
     if (initialValue > 0) {
@@ -404,6 +427,75 @@ function EditProgressDialog({
       setValue('');
     }
   }, [initialValue, isOpen]);
+
+  // Sub-exercises of this habit; when present they replace the single value
+  // input and the day's habit value becomes the number of completed ones.
+  const { data: subitems } = useQuery({
+    queryKey: ["habit_subitems", habit.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("habit_subitems")
+        .select("*")
+        .eq("habit_id", habit.id)
+        .order("position", { ascending: true })
+        .order("id", { ascending: true });
+      if (error) throw error;
+      return data as HabitSubitem[];
+    },
+    enabled: isOpen,
+  });
+
+  const { data: subitemDayValues } = useQuery({
+    queryKey: ["habit_subitem_progress", habit.id, dateStr],
+    queryFn: async () => {
+      const ids = (subitems || []).map((s) => s.id);
+      const { data, error } = await supabase
+        .from("habit_subitem_progress")
+        .select("subitem_id, value")
+        .eq("date", dateStr)
+        .in("subitem_id", ids);
+      if (error) throw error;
+      const map: Record<number, number> = {};
+      (data || []).forEach((p) => {
+        map[p.subitem_id] = p.value;
+      });
+      return map;
+    },
+    enabled: isOpen && !!subitems && subitems.length > 0,
+  });
+
+  const [subValues, setSubValues] = useState<Record<number, number | string>>({});
+  useEffect(() => {
+    setSubValues(subitemDayValues || {});
+  }, [subitemDayValues, isOpen, dateStr]);
+
+  const hasSubitems = !!subitems && subitems.length > 0;
+  const subNumeric = (id: number) => {
+    const v = subValues[id];
+    return typeof v === "string" ? Number(v) || 0 : v || 0;
+  };
+  const doneCount = (subitems || []).filter(
+    (s) => subNumeric(s.id) >= (s.target || 1)
+  ).length;
+
+  const handleSave = async () => {
+    if (hasSubitems) {
+      const rows = subitems!.map((s) => ({
+        subitem_id: s.id,
+        user_id: habit.user_id,
+        date: dateStr,
+        value: subNumeric(s.id),
+      }));
+      const { error } = await supabase
+        .from("habit_subitem_progress")
+        .upsert(rows, { onConflict: "subitem_id,user_id,date" });
+      if (error) console.error("Error saving sub-exercise progress:", error);
+      queryClient.invalidateQueries({ queryKey: ["habit_subitem_progress"] });
+      onSave(doneCount);
+    } else {
+      onSave(typeof value === "string" ? 0 : value);
+    }
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -417,9 +509,16 @@ function EditProgressDialog({
               {format(date, "EEEE, MMMM d, yyyy")}
             </span>
             <span className="text-sm text-muted-foreground">
-              Target: {habit.target_value} {habit.unit}
+              Target: {hasSubitems ? `${subitems!.length} sub-exercises` : `${habit.target_value} ${habit.unit}`}
             </span>
           </div>
+
+          {habit.habit_type === "snowball" && (
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <TrendingUp className="h-3 w-3" />
+              Snowball: +{habit.step_value ?? 0} every {habit.interval_days ?? 0} days
+            </p>
+          )}
 
           {habit.notes && (
             <p className="text-sm text-muted-foreground whitespace-pre-line border rounded-md p-2 bg-muted/50">
@@ -427,33 +526,86 @@ function EditProgressDialog({
             </p>
           )}
 
-          <div className="flex items-center space-x-2">
-            <Input
-              type="number"
-              autoFocus
-              min={0}
-              placeholder="0"
-              value={value}
-              className="text-xl"
-              onChange={(e) => {
-                const val = e.target.value === '' ? '' : parseFloat(e.target.value) || 0;
-                setValue(val);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  onSave(typeof value === 'string' ? 0 : value);
-                }
-              }}
-            />
-            <span className="text-lg">{habit.unit}</span>
-          </div>
+          {hasSubitems ? (
+            <div className="space-y-2">
+              {subitems!.map((s) => {
+                const done = subNumeric(s.id) >= (s.target || 1);
+                return (
+                  <div
+                    key={s.id}
+                    className="flex items-center gap-2 rounded-md border p-2"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-medium">{s.name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        Target: {s.target} {s.unit}
+                      </div>
+                    </div>
+                    {(s.target || 1) > 1 && (
+                      <NumberStepper
+                        min={0}
+                        value={subValues[s.id] ?? 0}
+                        onChange={(v) =>
+                          setSubValues((prev) => ({ ...prev, [s.id]: v }))
+                        }
+                        className="w-32 shrink-0"
+                        inputClassName="h-9"
+                        buttonClassName="h-9 w-9"
+                        aria-label={`${s.name} value`}
+                      />
+                    )}
+                    <Button
+                      size="icon"
+                      variant={done ? "default" : "outline"}
+                      className="shrink-0"
+                      style={done ? { backgroundColor: habit.color } : undefined}
+                      onClick={() =>
+                        setSubValues((prev) => ({
+                          ...prev,
+                          [s.id]: done ? 0 : s.target || 1,
+                        }))
+                      }
+                      aria-label={`Toggle ${s.name} done`}
+                      title={done ? "Mark as not done" : "Mark as done"}
+                    >
+                      <Check className="h-4 w-4" />
+                    </Button>
+                  </div>
+                );
+              })}
+              <p className="text-sm text-muted-foreground">
+                Completed: {doneCount} / {subitems!.length}
+              </p>
+            </div>
+          ) : (
+            <div className="flex items-center space-x-2">
+              <Input
+                type="number"
+                autoFocus
+                min={0}
+                placeholder="0"
+                value={value}
+                className="text-xl"
+                onChange={(e) => {
+                  const val = e.target.value === '' ? '' : parseFloat(e.target.value) || 0;
+                  setValue(val);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSave();
+                  }
+                }}
+              />
+              <span className="text-lg">{habit.unit}</span>
+            </div>
+          )}
 
           <div className="flex justify-end space-x-2 pt-4">
             <Button variant="outline" onClick={onClose}>
               Cancel
             </Button>
             <Button
-              onClick={() => onSave(typeof value === 'string' ? 0 : value)}
+              onClick={handleSave}
               style={{ backgroundColor: habit.color }}
               className="text-white"
             >

@@ -20,7 +20,7 @@
 - [x] S9  (DB) Demo presety muž/žena + smazání dema ✅
 - [x] S10 (DB) Poznámky ke zvykům ✅
 - [x] S11 (DB) Více odměn jednoho typu na těžší zvyk ✅
-- [ ] S12 (DB) Snowball / postupně rostoucí zvyky + podcviky
+- [x] S12 (DB) Snowball / postupně rostoucí zvyky + podcviky ✅
 - [ ] S13 (DB) Shluky zvyků AND/OR + eskalace
 - [ ] S14 (DB) Celkový progres + upevnění zvyku (21 dní)
 - [ ] S15 (DB) Kalendář + export do Google/Apple
@@ -207,6 +207,16 @@
 **DB:** typ zvyku (`snowball`), `base_target`, `step`, `interval_days` (např. 21 dní), a model „podcviků" (řádky pod hlavním zvykem — počet nebo fajfka).
 **Pokrývá body:** minimální denní cíl, pozvolný růst (21 dní), možnost navýšit dřív; hlavní zvyk „Cvičení" s podřádky (kliky/dřepy/sedlehy).
 **Ověření:** snowball zvyk roste podle pravidla; podcviky jdou vyplňovat jednotlivě.
+
+✅ **Hotovo (2026-06-12)** — **SQL APLIKOVÁNO** (Claude přes Chrome extension přímo v Supabase SQL editoru, projekt Dream Tracker): `supabase/sql/S12_snowball_subitems.sql` — na `habits` přidány sloupce `habit_type` (default `'standard'`), `base_target`, `step_value`, `interval_days`, `last_increase_at`; nové tabulky `habit_subitems` (name, target, unit, position; FK na habits s cascade) a `habit_subitem_progress` (unique `subitem_id+user_id+date`) vč. indexů a RLS (`auth.uid() = user_id`). Ověřeno dotazem do `information_schema.columns` → 18 řádků (5+8+5) přesně dle očekávání.
+1. **Model snowball:** `target_value` drží **aktuální** cíl; roste o `step_value` po každých `interval_days` od kotvy `last_increase_at` (fallback `created_at`). Růst se aplikuje **lazy** při načtení zvyků (`src/lib/snowball.ts` → `applySnowballGrowth`, volá se z `habits-page` i `today-habits`; kotva se posouvá po celých intervalech, takže kadence drží i při pozdním otevření appky; po zápisu se invaliduje query → nemůže cyklit). Žádný cron není potřeba.
+2. **`habit-form.tsx`:** nový select „Habit Type" (Standard / Snowball). U snowballu místo Target Value pole **Start Target** + blok **Increase By (step)** a **Every (days)** (default 21, NumberStepper). Při vytvoření `target_value = base_target`, `last_increase_at = dnes`; při editaci existujícího snowballu se vyrostlý target nepřepisuje; přepnutí standard→snowball restartuje na base. U editovaného snowballu řádek „Current target: X" + tlačítko **„Increase now (+step)"** (= možnost navýšit dřív; navýší hned a restartuje interval, zavře dialog).
+3. **Podcviky:** v habit-form sekce **Sub-exercises** — řádky název + target (NumberStepper; target 1 = fajfka) + X, „Add sub-exercise". Sync při uložení: update podle `id`, insert nových, delete odebraných.
+4. **Plnění jednotlivě (`habits-page.tsx` → `EditProgressDialog`):** má-li zvyk podcviky, místo jednoho čísla se zobrazí seznam podcviků — fajfka (toggle 0/target) u targetu 1, stepper + fajfka u vyšších. Denní hodnota zvyku = **počet splněných podcviků** (jde stejným pipeline: upsert `habit_progress` → `current_value` → `recomputeProgress` → příp. ruleta). Doporučení: u zvyku s podcviky nastavit target = počet podcviků. Záhlaví dialogu ukazuje „Target: N sub-exercises" a u snowballu řádek „Snowball: +X every Y days".
+5. **Indikace:** v History tabulce má snowball zvyk u targetu ikonku TrendingUp.
+6. **`shared/schema.ts`:** `Habit` rozšířen o snowball pole; nové typy `HabitSubitem`, `HabitSubitemProgress`.
+**Pozn.:** rychlé plnění na dashboardu (`TodayHabits`) u zvyků s podcviky dál zapisuje jen hlavní hodnotu (podcviky se plní v dialogu dne na Habits stránce) — případné rozšíření na dashboard je drobnost do některé další session.
+**Ověřeno:** SQL spuštěno a schéma potvrzeno v DB (18 sloupců); `tsc --noEmit` bez chyb; dev server (Vite) po reloadu renderuje login bez chyb v server logu i konzoli. Funkční scénář (snowball zvyk po N dnech/“Increase now" zvýší target; podcviky jdou vyplnit jednotlivě a den se zapíše jako počet splněných) je za přihlášením + Supabase daty — k ručnímu doověření majitelem dle kroků výše.
 
 ### S13 — (DB) Shluky zvyků AND/OR + eskalace
 **Soubory:** `shared/schema.ts`, habit-form/habits-page, navazuje na S12

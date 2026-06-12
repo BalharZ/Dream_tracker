@@ -39,7 +39,36 @@ export type Habit = {
   image: string | null;
   notes: string | null;
   is_demo: boolean;
+  // Snowball (gradually growing) habits: target_value holds the *current*
+  // target and grows by step_value every interval_days, starting from
+  // base_target. last_increase_at anchors the next scheduled increase.
+  habit_type: "standard" | "snowball";
+  base_target: number | null;
+  step_value: number | null;
+  interval_days: number | null;
+  last_increase_at: string | null;
   created_at: string;
+};
+
+// Sub-exercise row under a habit (e.g. "Exercise" → push-ups / squats / sit-ups).
+// target 1 behaves like a checkbox; higher targets are filled with a counter.
+export type HabitSubitem = {
+  id: number;
+  habit_id: number;
+  user_id: string;
+  name: string;
+  target: number;
+  unit: string;
+  position: number;
+  created_at: string;
+};
+
+export type HabitSubitemProgress = {
+  id: number;
+  subitem_id: number;
+  user_id: string;
+  date: string;
+  value: number;
 };
 
 export type HabitProgress = {

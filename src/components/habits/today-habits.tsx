@@ -12,6 +12,7 @@ import { supabase } from "@/lib/supabase";
 import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { recomputeProgress } from "@/lib/progress";
+import { applySnowballGrowth } from "@/lib/snowball";
 import { RewardRoulette } from "@/components/habits/reward-roulette";
 
 /**
@@ -84,6 +85,18 @@ export function TodayHabits() {
     },
     enabled: !!user,
   });
+
+  // Lazily apply due snowball increases (the dashboard is usually the first
+  // page that loads habits). A write invalidates the query; the refetched
+  // habits have nothing due, so this cannot loop.
+  useEffect(() => {
+    if (!habits || habits.length === 0) return;
+    applySnowballGrowth(habits)
+      .then((changed) => {
+        if (changed) queryClient.invalidateQueries({ queryKey: ["habits"] });
+      })
+      .catch((error) => console.error("Error applying snowball growth:", error));
+  }, [habits]);
 
   // Local, editable copy of today's values keyed by habit id.
   const [values, setValues] = useState<Record<number, number | string>>({});

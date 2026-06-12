@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
-import { useMutation } from "@tanstack/react-query";
-import { Habit, Goal, Reward } from "@shared/schema";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { format } from "date-fns";
+import { Habit, HabitSubitem, Goal, Reward } from "@shared/schema";
 import { supabase } from "@/lib/supabase";
 import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
@@ -36,6 +37,10 @@ import { Edit, Gift, Loader2, PlusCircle, X, Image as ImageIcon } from "lucide-r
 import { ImageGallery } from "@/components/images/image-gallery";
 import { conversionFactor, isTimeUnit, sameTimeUnit, timeAltUnit } from "@/lib/units";
 import { getChance, getQuantity, makeChanceEntry, parseHabitChances } from "@/lib/habit-chances";
+import { increaseSnowballNow } from "@/lib/snowball";
+
+// Editable sub-exercise row; id is set for rows loaded from the DB.
+type SubitemDraft = { id?: number; name: string; target: number | string };
 
 export function HabitForm({
   goals,
@@ -64,6 +69,32 @@ export function HabitForm({
   const [newRewardName, setNewRewardName] = useState("");
   const [newRewardImage, setNewRewardImage] = useState("");
   const [rewardGalleryOpen, setRewardGalleryOpen] = useState(false);
+  const [subitems, setSubitems] = useState<SubitemDraft[]>([]);
+
+  // Existing sub-exercises of the edited habit (synced on save: update by id,
+  // insert new, delete removed).
+  const { data: existingSubitems } = useQuery({
+    queryKey: ["habit_subitems", habit?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("habit_subitems")
+        .select("*")
+        .eq("habit_id", habit!.id)
+        .order("position", { ascending: true })
+        .order("id", { ascending: true });
+      if (error) throw error;
+      return data as HabitSubitem[];
+    },
+    enabled: !!habit,
+  });
+
+  useEffect(() => {
+    if (habit) {
+      setSubitems(
+        (existingSubitems || []).map((s) => ({ id: s.id, name: s.name, target: s.target }))
+      );
+    }
+  }, [habit, existingSubitems]);
 
   // Distribute ~50% across the selected rewards (evenly) and leave ~50% for
   // the "no reward" outcome. Re-runs whenever rewards are added/removed.
@@ -95,6 +126,10 @@ export function HabitForm({
       positive_motivation: habit?.positive_motivation || null as string | null,
       negative_motivation: habit?.negative_motivation || null as string | null,
       notes: habit?.notes || "",
+      habit_type: habit?.habit_type || "standard",
+      base_target: (habit?.base_target ?? 0) as number | string,
+      step_value: (habit?.step_value ?? 1) as number | string,
+      interval_days: (habit?.interval_days ?? 21) as number | string,
     },
   });
 
@@ -111,6 +146,10 @@ export function HabitForm({
         positive_motivation: habit.positive_motivation,
         negative_motivation: habit.negative_motivation,
         notes: habit.notes || "",
+        habit_type: habit.habit_type || "standard",
+        base_target: habit.base_target ?? 0,
+        step_value: habit.step_value ?? 1,
+        interval_days: habit.interval_days ?? 21,
       });
 
       setDialogOpen(true);
@@ -143,11 +182,16 @@ export function HabitForm({
         positive_motivation: null,
         negative_motivation: null,
         notes: "",
+        habit_type: "standard",
+        base_target: 0,
+        step_value: 1,
+        interval_days: 21,
       });
       setNoRewards(false);
       setSelectedRewards([]);
       setRewardChances({});
       setRewardQuantities({});
+      setSubitems([]);
     }
   }, [habit, rewards]);
 
@@ -155,20 +199,38 @@ export function HabitForm({
     mutationFn: async (values: any) => {
       let newHabit: Habit;
 
+      const isSnow = values.habit_type === "snowball";
+      const wasSnow = habit?.habit_type === "snowball";
+      const todayStr = format(new Date(), "yyyy-MM-dd");
+      const basePayload = {
+        name: values.name,
+        unit: values.unit,
+        goal_id: values.goal_id || null,
+        frequency: values.frequency,
+        color: values.color,
+        image: values.image,
+        positive_motivation: values.positive_motivation,
+        negative_motivation: values.negative_motivation,
+        notes: values.notes?.trim() || null,
+        habit_type: isSnow ? "snowball" : "standard",
+        base_target: isSnow ? values.base_target : null,
+        step_value: isSnow ? values.step_value : null,
+        interval_days: isSnow ? values.interval_days : null,
+      };
+
       if (habit) {
         const { data, error } = await supabase
           .from("habits")
           .update({
-            name: values.name,
-            unit: values.unit,
-            goal_id: values.goal_id || null,
-            frequency: values.frequency,
-            color: values.color,
-            target_value: values.target_value,
-            image: values.image,
-            positive_motivation: values.positive_motivation,
-            negative_motivation: values.negative_motivation,
-            notes: values.notes?.trim() || null,
+            ...basePayload,
+            // An existing snowball habit keeps its grown target; switching a
+            // standard habit to snowball (re)starts at the base target.
+            target_value: isSnow
+              ? wasSnow
+                ? habit.target_value
+                : values.base_target
+              : values.target_value,
+            last_increase_at: isSnow ? (wasSnow ? habit.last_increase_at : todayStr) : null,
           })
           .eq("id", habit.id)
           .select()
@@ -179,16 +241,9 @@ export function HabitForm({
         const { data, error } = await supabase
           .from("habits")
           .insert({
-            name: values.name,
-            unit: values.unit,
-            goal_id: values.goal_id || null,
-            frequency: values.frequency,
-            color: values.color,
-            target_value: values.target_value,
-            image: values.image,
-            positive_motivation: values.positive_motivation,
-            negative_motivation: values.negative_motivation,
-            notes: values.notes?.trim() || null,
+            ...basePayload,
+            target_value: isSnow ? values.base_target : values.target_value,
+            last_increase_at: isSnow ? todayStr : null,
             user_id: user!.id,
           })
           .select()
@@ -196,6 +251,50 @@ export function HabitForm({
         if (error) throw error;
         newHabit = data as Habit;
       }
+
+      // Sync sub-exercises: update existing rows by id, insert new ones,
+      // delete the removed ones.
+      const cleaned = subitems
+        .map((s, i) => {
+          const target = Number(s.target);
+          return {
+            id: s.id,
+            name: s.name.trim(),
+            target: Number.isFinite(target) && target > 0 ? target : 1,
+            position: i,
+          };
+        })
+        .filter((s) => s.name);
+      const keepIds = new Set(cleaned.filter((s) => s.id).map((s) => s.id!));
+      const removed = (existingSubitems || []).filter((s) => !keepIds.has(s.id));
+      const subitemOps: PromiseLike<unknown>[] = [];
+      if (removed.length > 0) {
+        subitemOps.push(
+          supabase.from("habit_subitems").delete().in("id", removed.map((s) => s.id))
+        );
+      }
+      for (const s of cleaned) {
+        if (s.id) {
+          subitemOps.push(
+            supabase
+              .from("habit_subitems")
+              .update({ name: s.name, target: s.target, position: s.position })
+              .eq("id", s.id)
+          );
+        } else {
+          subitemOps.push(
+            supabase.from("habit_subitems").insert({
+              habit_id: newHabit.id,
+              user_id: user!.id,
+              name: s.name,
+              target: s.target,
+              unit: "",
+              position: s.position,
+            })
+          );
+        }
+      }
+      await Promise.all(subitemOps);
 
       if (!noRewards && selectedRewards.length > 0) {
         for (const rewardId of selectedRewards) {
@@ -240,6 +339,7 @@ export function HabitForm({
     onSuccess: (newHabit) => {
       queryClient.invalidateQueries({ queryKey: ["habits"] });
       queryClient.invalidateQueries({ queryKey: ["rewards"] });
+      queryClient.invalidateQueries({ queryKey: ["habit_subitems"] });
 
       if (newHabit.goal_id) {
         queryClient.invalidateQueries({ queryKey: ["goals"] });
@@ -345,6 +445,29 @@ export function HabitForm({
     },
   });
 
+  // "Increase earlier" for snowball habits: bump the target right away and
+  // restart the interval, then close the dialog (the habit prop would be stale).
+  const increaseNow = useMutation({
+    mutationFn: async () => increaseSnowballNow(habit!),
+    onSuccess: (newTarget) => {
+      queryClient.invalidateQueries({ queryKey: ["habits"] });
+      toast({
+        title: "Target increased!",
+        description: `New target: ${newTarget} ${habit?.unit || ""}`.trim(),
+      });
+      onSuccess();
+      setDialogOpen(false);
+    },
+    onError: (error) => {
+      console.error(error);
+      toast({
+        title: "Error!",
+        description: "Failed to increase the target.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const rootGoals = goals?.filter((goal) => !goal.parent_goal_id && goal.id) || [];
   const subgoals = goals?.filter((goal) => {
     if (!goal.parent_goal_id || !goal.id) return false;
@@ -387,15 +510,17 @@ export function HabitForm({
 
           <Form {...form}>
             <form
-              onSubmit={form.handleSubmit((data) =>
+              onSubmit={form.handleSubmit((data) => {
+                const num = (v: unknown, fallback = 0) =>
+                  v === "" || v === null || v === undefined ? fallback : Number(v) || fallback;
                 createHabit.mutate({
                   ...data,
-                  target_value:
-                    data.target_value === "" || data.target_value === null
-                      ? 0
-                      : Number(data.target_value),
-                })
-              )}
+                  target_value: num(data.target_value),
+                  base_target: num(data.base_target),
+                  step_value: num(data.step_value),
+                  interval_days: Math.max(1, Math.round(num(data.interval_days, 21)) || 21),
+                });
+              })}
               className="space-y-4"
             >
               <FormField
@@ -462,23 +587,63 @@ export function HabitForm({
                 )}
               />
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="target_value"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Target Value</FormLabel>
+              <FormField
+                control={form.control}
+                name="habit_type"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Habit Type</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <NumberStepper
-                          min={0}
-                          value={field.value ?? ""}
-                          onChange={field.onChange}
-                        />
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select type" />
+                        </SelectTrigger>
                       </FormControl>
-                    </FormItem>
-                  )}
-                />
+                      <SelectContent>
+                        <SelectItem value="standard">Standard</SelectItem>
+                        <SelectItem value="snowball">Snowball (target grows over time)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormItem>
+                )}
+              />
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {form.watch("habit_type") === "snowball" ? (
+                  <FormField
+                    control={form.control}
+                    name="base_target"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Start Target</FormLabel>
+                        <FormControl>
+                          <NumberStepper
+                            min={0}
+                            value={field.value ?? ""}
+                            onChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                ) : (
+                  <FormField
+                    control={form.control}
+                    name="target_value"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Target Value</FormLabel>
+                        <FormControl>
+                          <NumberStepper
+                            min={0}
+                            value={field.value ?? ""}
+                            onChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                )}
 
                 <FormField
                   control={form.control}
@@ -525,6 +690,71 @@ export function HabitForm({
                   }}
                 />
               </div>
+
+              {form.watch("habit_type") === "snowball" && (
+                <div className="space-y-3 border p-3 rounded-md">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="step_value"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Increase By (step)</FormLabel>
+                          <FormControl>
+                            <NumberStepper
+                              min={0}
+                              value={field.value ?? ""}
+                              onChange={field.onChange}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="interval_days"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Every (days)</FormLabel>
+                          <FormControl>
+                            <NumberStepper
+                              min={1}
+                              value={field.value ?? ""}
+                              onChange={field.onChange}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    The target starts at the start target and automatically grows by the
+                    step after each interval (e.g. every 21 days).
+                  </p>
+                  {habit && habit.habit_type === "snowball" && (
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm">
+                        Current target:{" "}
+                        <span className="font-semibold">
+                          {habit.target_value} {habit.unit}
+                        </span>
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={increaseNow.isPending || !(habit.step_value && habit.step_value > 0)}
+                        onClick={() => increaseNow.mutate()}
+                      >
+                        {increaseNow.isPending ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : null}
+                        Increase now (+{habit.step_value ?? 0})
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField
@@ -602,6 +832,73 @@ export function HabitForm({
                   </FormItem>
                 )}
               />
+
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <FormLabel>Sub-exercises</FormLabel>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSubitems((prev) => [...prev, { name: "", target: 1 }])}
+                  >
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Add sub-exercise
+                  </Button>
+                </div>
+                {subitems.length > 0 && (
+                  <div className="space-y-2 border p-3 rounded-md">
+                    {subitems.map((s, i) => (
+                      <div key={s.id ?? `new-${i}`} className="flex items-center gap-2">
+                        <Input
+                          placeholder="e.g. Push-ups"
+                          value={s.name}
+                          className="flex-1"
+                          onChange={(e) =>
+                            setSubitems((prev) =>
+                              prev.map((row, idx) =>
+                                idx === i ? { ...row, name: e.target.value } : row
+                              )
+                            )
+                          }
+                        />
+                        <NumberStepper
+                          min={0}
+                          value={s.target}
+                          onChange={(val) =>
+                            setSubitems((prev) =>
+                              prev.map((row, idx) =>
+                                idx === i ? { ...row, target: val } : row
+                              )
+                            )
+                          }
+                          className="w-28 shrink-0"
+                          inputClassName="h-9"
+                          buttonClassName="h-9 w-9"
+                          aria-label="Sub-exercise target"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-9 w-9 shrink-0"
+                          onClick={() =>
+                            setSubitems((prev) => prev.filter((_, idx) => idx !== i))
+                          }
+                          aria-label="Remove sub-exercise"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    <p className="text-xs text-muted-foreground">
+                      Sub-exercises are filled one by one when logging a day. The day's
+                      habit value becomes the number of completed sub-exercises (a target
+                      of 1 works like a checkbox).
+                    </p>
+                  </div>
+                )}
+              </div>
 
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
