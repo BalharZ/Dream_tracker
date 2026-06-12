@@ -24,7 +24,7 @@
 - [x] S13 (DB) Shluky zvyků AND/OR + eskalace ✅
 - [x] S14 (compute) Celkový progres + upevnění zvyku (21 dní) ✅
 - [x] S15 (DB) Kalendář + export do Google/Apple ✅
-- [ ] S16 (DB/infra) Push notifikace + čas u zvyku + obsah z snu
+- [x] S16 (DB/infra) Push notifikace + čas u zvyku + obsah z snu ✅
 - [ ] S17 (native) Widget na plochu telefonu
 
 ---
@@ -261,6 +261,16 @@
 **DB/infra:** nastavení notifikací u zvyku (`notify bool`, `notify_time`), tabulka push subscriptions; web push (PWA) + odesílání přes Edge Function. (Nativně později přes Capacitor.)
 **Pokrývá body:** notifikace do telefonu; u zvyku zapnutí + čas; notifikace ukáže obrázek snu + pozitivní i negativní motivaci.
 **Ověření:** ve zvolený čas přijde push s obrázkem snu a motivací.
+
+✅ **Hotovo (2026-06-12)** — **SQL + Edge Function + secrets + cron NASAZENO** (Claude přes Chrome extension přímo v Supabase dashboardu, projekt Dream Tracker):
+1. **DB (`supabase/sql/S16_push_notifications.sql`, část A):** `habits.notify` (boolean, default false), `habits.notify_time` (time), `habits.last_notified_date` (date — dedup max 1 push/zvyk/den); nová tabulka `push_subscriptions` (user_id, endpoint **unique**, p256dh, auth) + index + RLS „Users manage own push subscriptions". Ověřeno dotazem do `information_schema.columns` (9 sloupců přesně dle návrhu).
+2. **Edge Function `send-habit-notifications`** (`supabase/functions/send-habit-notifications/index.ts`, nasazena přes dashboard editor; návod v `supabase/functions/README.md`): běží každých 5 min přes **pg_cron + pg_net** (část B SQL — job `send-habit-notifications` aktivní). Vybere zvyky s notify=true, jejichž `notify_time` (Europe/Prague, env `NOTIFY_TZ`) právě uplynul (catch-up okno 90 min, dedup `last_notified_date`), dohledá zvyk → cíl → **sen** a pošle web push: titulek ⏰ + jméno zvyku, tělo ✨ pozitivní + ⚠️ negativní motivace (ze snu, fallback na motivace zvyku), velký obrázek = obrázek snu. Mrtvé subscriptions (404/410) maže. **Test: ruční POST vrátil 200 `{"sent":0,"checked":0}`.** Secrets nastaveny: `VAPID_KEYS` (vygenerováno `scripts/generate-vapid-keys.mjs`; lokální záloha `supabase/vapid-keys.secret.txt` je gitignored), `CONTACT_EMAIL`.
+3. **Klient (PWA + push):** `public/sw.js` (push → showNotification s obrázkem; klik → otevře app), `public/manifest.webmanifest` + ikona `public/icons/icon-512.png` + meta/odkazy v `index.html` (kvůli iOS „Přidat na plochu"); `src/lib/push.ts` — `registerServiceWorker()` při startu (main.tsx) a `ensurePushSubscription()` (permission → subscribe s `VITE_VAPID_PUBLIC_KEY` → upsert do `push_subscriptions` dle endpointu). Public klíč přidán do `.env.local`.
+4. **habit-form:** nový blok **„Reminder notification"** — checkbox + pole času (default 08:00, skryté při vypnutí). Zaškrtnutí rovnou subscribuje tento prohlížeč (gesto uživatele → permission prompt; toasty pro denied/unsupported/error). Uložení zapisuje `notify`/`notify_time`; změna času nebo (re)zapnutí nuluje `last_notified_date`, aby pozdější čas tentýž den ještě vystřelil.
+5. **`shared/schema.ts`:** `Habit.notify/notify_time/last_notified_date` + nový typ `PushSubscriptionRow`.
+6. **Bonus oprava `tsconfig.json`:** `include`/`paths` ukazovaly na neexistující `client/src` → `tsc` dosud nekontroloval nic ze `src/`. Opraveno na `src/**` — celý projekt nyní prochází strict checkem bez chyb.
+**Zbývá ručně (1 krok):** přidat `VITE_VAPID_PUBLIC_KEY` (hodnota v `.env.local`) do Vercel → Environment Variables a redeploynout; bez toho se produkční web neumí subscribnout (lokálně funguje). Pak na telefonu: Android Chrome rovnou / iPhone nejdřív „Přidat na plochu" → otevřít zvyk → zapnout Reminder + čas → povolit notifikace.
+**Ověřeno:** `tsc --noEmit` (nově celý `src/`) bez chyb; dev server — SW zaregistrovaný a aktivní, `manifest.webmanifest` i `sw.js` 200, konzole bez chyb; Edge Function odpovídá 200; cron job aktivní (`select jobname, schedule, active from cron.job`). Doručení reálného pushe ve zvolený čas je k doověření majitelem na telefonu dle kroků výše.
 
 ### S17 — (native) Widget na plochu telefonu
 **Soubory:** Capacitor projekt + nativní Android widget

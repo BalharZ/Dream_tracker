@@ -52,6 +52,22 @@ export type Habit = {
   // anchors the interval; null escalation_days = no escalation.
   escalation_days: number | null;
   last_escalation_at: string | null;
+  // Push reminder: notify_time is a Postgres `time` ("HH:MM:SS") in the
+  // user's local timezone; last_notified_date dedupes to one push per day
+  // (written by the send-habit-notifications Edge Function).
+  notify: boolean;
+  notify_time: string | null;
+  last_notified_date: string | null;
+  created_at: string;
+};
+
+// One web-push subscription per browser/device (endpoint is unique).
+export type PushSubscriptionRow = {
+  id: number;
+  user_id: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
   created_at: string;
 };
 

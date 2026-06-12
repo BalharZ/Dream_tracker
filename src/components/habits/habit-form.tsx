@@ -33,12 +33,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Edit, Gift, Loader2, PlusCircle, X, Image as ImageIcon } from "lucide-react";
+import { Bell, Edit, Gift, Loader2, PlusCircle, X, Image as ImageIcon } from "lucide-react";
 import { ImageGallery } from "@/components/images/image-gallery";
 import { conversionFactor, isTimeUnit, sameTimeUnit, timeAltUnit } from "@/lib/units";
 import { getChance, getQuantity, makeChanceEntry, parseHabitChances } from "@/lib/habit-chances";
 import { increaseSnowballNow } from "@/lib/snowball";
 import { escalationDue, snoozeEscalation } from "@/lib/habit-clusters";
+import { ensurePushSubscription } from "@/lib/push";
 
 // Editable sub-exercise row; id is set for rows loaded from the DB.
 // or_group: OR cluster number (null = required individually / AND).
@@ -143,6 +144,9 @@ export function HabitForm({
       step_value: (habit?.step_value ?? 1) as number | string,
       interval_days: (habit?.interval_days ?? 21) as number | string,
       escalation_days: (habit?.escalation_days ?? 0) as number | string,
+      notify: habit?.notify || false,
+      // DB `time` is "HH:MM:SS"; <input type="time"> wants "HH:MM".
+      notify_time: habit?.notify_time?.slice(0, 5) || "08:00",
     },
   });
 
@@ -164,6 +168,8 @@ export function HabitForm({
         step_value: habit.step_value ?? 1,
         interval_days: habit.interval_days ?? 21,
         escalation_days: habit.escalation_days ?? 0,
+        notify: habit.notify || false,
+        notify_time: habit.notify_time?.slice(0, 5) || "08:00",
       });
 
       setDialogOpen(true);
@@ -201,6 +207,8 @@ export function HabitForm({
         step_value: 1,
         interval_days: 21,
         escalation_days: 0,
+        notify: false,
+        notify_time: "08:00",
       });
       setNoRewards(false);
       setSelectedRewards([]);
@@ -218,6 +226,13 @@ export function HabitForm({
       const wasSnow = habit?.habit_type === "snowball";
       const todayStr = format(new Date(), "yyyy-MM-dd");
       const escDays = values.escalation_days > 0 ? values.escalation_days : null;
+      // Reminder: when the time or the toggle changes, clear the daily dedup
+      // so a time later today still fires.
+      const notifyTime = values.notify ? values.notify_time || "08:00" : null;
+      const notifyChanged =
+        !habit ||
+        !!habit.notify !== !!values.notify ||
+        (habit.notify_time?.slice(0, 5) ?? null) !== notifyTime;
       const basePayload = {
         name: values.name,
         unit: values.unit,
@@ -233,6 +248,9 @@ export function HabitForm({
         step_value: isSnow ? values.step_value : null,
         interval_days: isSnow ? values.interval_days : null,
         escalation_days: escDays,
+        notify: !!values.notify,
+        notify_time: notifyTime,
+        ...(notifyChanged ? { last_notified_date: null } : {}),
       };
 
       // Adding a new sub-exercise while an escalation is due counts as the
@@ -893,6 +911,72 @@ export function HabitForm({
                   </FormItem>
                 )}
               />
+
+              <div className="space-y-2 border p-3 rounded-md">
+                <div className="flex items-center justify-between gap-2">
+                  <label
+                    htmlFor="habit-notify"
+                    className="flex items-center gap-2 text-sm font-medium cursor-pointer"
+                  >
+                    <Bell className="h-4 w-4" />
+                    Reminder notification
+                  </label>
+                  <input
+                    type="checkbox"
+                    id="habit-notify"
+                    className="h-4 w-4"
+                    checked={form.watch("notify")}
+                    onChange={async (e) => {
+                      const checked = e.target.checked;
+                      form.setValue("notify", checked);
+                      if (!checked || !user) return;
+                      // Subscribe this browser right away — the click is the
+                      // user gesture the permission prompt needs.
+                      const result = await ensurePushSubscription(user.id);
+                      if (result === "denied") {
+                        toast({
+                          title: "Notifications blocked",
+                          description:
+                            "Allow notifications for this site (or enable the reminder on the device where you want it).",
+                          variant: "destructive",
+                        });
+                      } else if (result === "unsupported") {
+                        toast({
+                          title: "Push not supported here",
+                          description:
+                            "This browser can't receive push notifications. On iPhone, install the app to the home screen first.",
+                          variant: "destructive",
+                        });
+                      } else if (result === "error") {
+                        toast({
+                          title: "Subscription failed",
+                          description:
+                            "Could not register this device for push. The reminder stays on — try again later.",
+                          variant: "destructive",
+                        });
+                      }
+                    }}
+                  />
+                </div>
+                {form.watch("notify") && (
+                  <FormField
+                    control={form.control}
+                    name="notify_time"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Remind me at</FormLabel>
+                        <FormControl>
+                          <Input type="time" className="w-40" {...field} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Sends a push notification at the chosen time with your dream's
+                  image and your positive &amp; negative motivation.
+                </p>
+              </div>
 
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
