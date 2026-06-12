@@ -61,4 +61,8 @@ export type Reward = {
   created_at: string;
 };
 
-export type HabitChances = { [habitId: number]: number };
+// Value per habit: either a plain number (legacy format = win chance in %,
+// quantity 1) or an object with the chance and how many pieces of the reward
+// a single win grants (e.g. 5× "1 h of gaming" for a harder habit).
+export type ChanceEntry = number | { chance: number; quantity?: number };
+export type HabitChances = { [habitId: number]: ChanceEntry };

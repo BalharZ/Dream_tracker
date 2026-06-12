@@ -6,6 +6,7 @@ import { Habit, Reward } from "@shared/schema";
 import { supabase } from "@/lib/supabase";
 import { queryClient } from "@/lib/queryClient";
 import { motion } from "framer-motion";
+import { getChance, getQuantity, parseHabitChances } from "@/lib/habit-chances";
 
 /**
  * Reward "case opening" roulette. Shared between the Habits page and the
@@ -69,27 +70,17 @@ export function RewardRoulette({
         habit_chances: "{}"
       } as Reward;
 
-      const habitRewards = rewards.filter(r => {
-        try {
-          const chances = JSON.parse(r.habit_chances || "{}");
-          return chances[habit.id] !== undefined;
-        } catch {
-          return false;
-        }
-      });
+      const habitRewards = rewards.filter(
+        r => parseHabitChances(r.habit_chances)[habit.id] !== undefined
+      );
 
       let totalChance = 0;
       const rewardChances: Record<number, number> = {};
 
       habitRewards.forEach(reward => {
-        try {
-          const chances = JSON.parse(reward.habit_chances || "{}");
-          const chance = chances[habit.id] || 0;
-          rewardChances[reward.id] = chance;
-          totalChance += chance;
-        } catch (error) {
-          console.error("Error parsing reward chances:", error);
-        }
+        const chance = getChance(parseHabitChances(reward.habit_chances)[habit.id]);
+        rewardChances[reward.id] = chance;
+        totalChance += chance;
       });
 
       let chosenReward = emptySlot;
@@ -143,9 +134,13 @@ export function RewardRoulette({
 
           if (!rewardClaimedRef.current && chosenReward.id > 0) {
             rewardClaimedRef.current = true;
+            // A harder habit can grant several pieces of the same reward at once.
+            const wonQuantity = getQuantity(
+              parseHabitChances(chosenReward.habit_chances)[habit.id]
+            );
             supabase
               .from("rewards")
-              .update({ available: chosenReward.available + 1 })
+              .update({ available: chosenReward.available + wonQuantity })
               .eq("id", chosenReward.id)
               .then(({ error }) => {
                 if (error) {
@@ -220,26 +215,23 @@ export function RewardRoulette({
               >
                 {rewardCards.map((card, index) => {
                   const isWinningCard = index === 50;
+                  const cardQuantity =
+                    card.id > 0 ? getQuantity(parseHabitChances(card.habit_chances)[habit.id]) : 1;
 
                   return (
                     <div
                       key={`card-${index}`}
                       ref={isWinningCard ? winningCardRef : undefined}
-                      className={`flex-shrink-0 w-28 h-32 mx-1 p-2 rounded-lg flex flex-col items-center justify-center
+                      className={`relative flex-shrink-0 w-28 h-32 mx-1 p-2 rounded-lg flex flex-col items-center justify-center
                         ${card.id === 0
                           ? 'bg-gray-800/80 border-2 border-gray-600'
                           : (() => {
-                              try {
-                                const chances = JSON.parse(card.habit_chances || "{}");
-                                const chance = chances[habit.id] || 0;
-                                if (chance < 10) return 'bg-amber-900/80 border-2 border-amber-600';
-                                if (chance < 20) return 'bg-red-900/80 border-2 border-red-600';
-                                if (chance < 30) return 'bg-purple-900/80 border-2 border-purple-600';
-                                if (chance < 50) return 'bg-blue-900/80 border-2 border-blue-600';
-                                return 'bg-green-900/80 border-2 border-green-600';
-                              } catch {
-                                return 'bg-blue-900/80 border-2 border-blue-600';
-                              }
+                              const chance = getChance(parseHabitChances(card.habit_chances)[habit.id]);
+                              if (chance < 10) return 'bg-amber-900/80 border-2 border-amber-600';
+                              if (chance < 20) return 'bg-red-900/80 border-2 border-red-600';
+                              if (chance < 30) return 'bg-purple-900/80 border-2 border-purple-600';
+                              if (chance < 50) return 'bg-blue-900/80 border-2 border-blue-600';
+                              return 'bg-green-900/80 border-2 border-green-600';
                             })()
                         }`
                       }
@@ -253,6 +245,11 @@ export function RewardRoulette({
                         zIndex: 1
                       } : {}}
                     >
+                      {cardQuantity > 1 && (
+                        <div className="absolute top-1 right-1 z-10 px-1.5 py-0.5 rounded-md bg-orange-500 text-white text-[10px] font-bold leading-none">
+                          ×{cardQuantity}
+                        </div>
+                      )}
                       <div className="w-22 h-22 rounded-md overflow-hidden bg-gray-700 flex items-center justify-center mb-1">
                         {card.id > 0 ? (
                           <img
@@ -302,7 +299,17 @@ export function RewardRoulette({
                   {selectedReward.id > 0 ? (
                     <>
                       <p className="text-green-400 font-medium text-lg">
-                        You won a <span className="font-bold">{selectedReward.name}</span>!
+                        {(() => {
+                          const q = getQuantity(
+                            parseHabitChances(selectedReward.habit_chances)[habit.id]
+                          );
+                          return (
+                            <>
+                              You won {q > 1 ? `${q}× ` : "a "}
+                              <span className="font-bold">{selectedReward.name}</span>!
+                            </>
+                          );
+                        })()}
                       </p>
                       <p className="text-gray-400 text-sm mt-1">
                         You'll find your reward in Rewards.

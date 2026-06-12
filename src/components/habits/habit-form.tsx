@@ -35,6 +35,7 @@ import {
 import { Edit, Gift, Loader2, PlusCircle, X, Image as ImageIcon } from "lucide-react";
 import { ImageGallery } from "@/components/images/image-gallery";
 import { conversionFactor, isTimeUnit, sameTimeUnit, timeAltUnit } from "@/lib/units";
+import { getChance, getQuantity, makeChanceEntry, parseHabitChances } from "@/lib/habit-chances";
 
 export function HabitForm({
   goals,
@@ -56,6 +57,9 @@ export function HabitForm({
   const [noRewards, setNoRewards] = useState(false);
   const [selectedRewards, setSelectedRewards] = useState<number[]>([]);
   const [rewardChances, setRewardChances] = useState<Record<number, number>>({});
+  // How many pieces of the reward one win grants ("" while the field is being
+  // cleared/typed; coerced to >= 1 on save).
+  const [rewardQuantities, setRewardQuantities] = useState<Record<number, number | "">>({});
   const [showCreateReward, setShowCreateReward] = useState(false);
   const [newRewardName, setNewRewardName] = useState("");
   const [newRewardImage, setNewRewardImage] = useState("");
@@ -111,26 +115,22 @@ export function HabitForm({
 
       setDialogOpen(true);
 
-      const habitRewards = rewards.filter(r => {
-        try {
-          const chances = JSON.parse(r.habit_chances || "{}");
-          return chances[habit.id] !== undefined;
-        } catch {
-          return false;
-        }
-      });
+      const habitRewards = rewards.filter(
+        r => parseHabitChances(r.habit_chances)[habit.id] !== undefined
+      );
 
       setNoRewards(habitRewards.length === 0);
       setSelectedRewards(habitRewards.map(r => r.id));
 
       const chances: Record<number, number> = {};
+      const quantities: Record<number, number> = {};
       habitRewards.forEach(r => {
-        try {
-          const hc = JSON.parse(r.habit_chances || "{}");
-          chances[r.id] = hc[habit.id] || 50;
-        } catch {}
+        const entry = parseHabitChances(r.habit_chances)[habit.id];
+        chances[r.id] = getChance(entry) || 50;
+        quantities[r.id] = getQuantity(entry);
       });
       setRewardChances(chances);
+      setRewardQuantities(quantities);
     } else {
       form.reset({
         name: "",
@@ -147,6 +147,7 @@ export function HabitForm({
       setNoRewards(false);
       setSelectedRewards([]);
       setRewardChances({});
+      setRewardQuantities({});
     }
   }, [habit, rewards]);
 
@@ -202,10 +203,11 @@ export function HabitForm({
           if (!reward) continue;
 
           try {
-            const currentChances = JSON.parse(reward.habit_chances || "{}");
+            const currentChances = parseHabitChances(reward.habit_chances);
+            const quantity = Math.max(1, Math.round(Number(rewardQuantities[rewardId])) || 1);
             const updatedChances = {
               ...currentChances,
-              [newHabit.id]: rewardChances[rewardId] || 50
+              [newHabit.id]: makeChanceEntry(rewardChances[rewardId] || 50, quantity)
             };
 
             await supabase
@@ -719,6 +721,30 @@ export function HabitForm({
                                   );
                                 })()}
                                 <span className="text-xs text-muted-foreground">%</span>
+                              </div>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="text-xs text-muted-foreground">Pieces per win:</span>
+                                <NumberStepper
+                                  min={1}
+                                  max={99}
+                                  value={rewardQuantities[reward.id] ?? 1}
+                                  onChange={(val) => {
+                                    if (val === "") {
+                                      setRewardQuantities(prev => ({ ...prev, [reward.id]: "" }));
+                                      return;
+                                    }
+                                    const num = Math.round(Number(val));
+                                    if (Number.isNaN(num)) return;
+                                    setRewardQuantities(prev => ({
+                                      ...prev,
+                                      [reward.id]: Math.max(1, Math.min(num, 99)),
+                                    }));
+                                  }}
+                                  className="w-32"
+                                  inputClassName="h-8"
+                                  buttonClassName="h-8 w-8"
+                                />
+                                <span className="text-xs text-muted-foreground">×</span>
                               </div>
                             </div>
                             <Button

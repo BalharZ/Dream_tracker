@@ -19,7 +19,7 @@
 - [x] S8  Jednotky — dědění z cíle + čas v minutách ✅
 - [x] S9  (DB) Demo presety muž/žena + smazání dema ✅
 - [x] S10 (DB) Poznámky ke zvykům ✅
-- [ ] S11 (DB) Více odměn jednoho typu na těžší zvyk
+- [x] S11 (DB) Více odměn jednoho typu na těžší zvyk ✅
 - [ ] S12 (DB) Snowball / postupně rostoucí zvyky + podcviky
 - [ ] S13 (DB) Shluky zvyků AND/OR + eskalace
 - [ ] S14 (DB) Celkový progres + upevnění zvyku (21 dní)
@@ -194,6 +194,13 @@
 **DB/Model:** k potvrzení — buď `quantity` v `habit_chances` JSON (bez schématu), nebo nové pole. (např. 5× 1 h hraní).
 **Pokrývá body:** přiřadit více instancí jedné odměny náročnějšímu zvyku.
 **Ověření:** zvyku jde nastavit více kusů jedné odměny a ruleta/claim to respektuje.
+
+✅ **Hotovo (2026-06-12)** — **BEZ SQL**: zvolena varianta „quantity v `habit_chances` JSON" (sloupec je `text`, žádná změna schématu). Hodnota v JSON je nově buď číslo (stará data = šance v %, množství 1), nebo objekt `{ chance, quantity }`; při uložení s množstvím 1 se zapisuje zpět prosté číslo → plná zpětná kompatibilita (staré parsery `chances[habitId] !== undefined` v `habits-page`/`today-habits` fungují beze změny).
+1. **Nový `src/lib/habit-chances.ts`:** helpery `parseHabitChances` (bezpečný parse), `getChance`, `getQuantity` (číslo → 1; objekt → `max(1, round(quantity))`), `makeChanceEntry` (quantity > 1 → objekt, jinak číslo).
+2. **`shared/schema.ts`:** `HabitChances` rozšířen na `{ [habitId]: ChanceEntry }`, kde `ChanceEntry = number | { chance, quantity? }`.
+3. **`habit-form.tsx`:** u každé vybrané odměny nový stepper **„Pieces per win" ×** (NumberStepper, min 1, max 99, default 1; jde vymazat během psaní, koerce na ≥1 při uložení). Při editaci zvyku se množství načte z JSON; při uložení se zapisuje přes `makeChanceEntry`. Odebrání odměny/zvyku z `habit_chances` beze změny (funguje pro obě podoby hodnoty).
+4. **`reward-roulette.tsx`:** šance se čtou přes helpery (číslo i objekt); **claim připíše `available + quantity`** místo +1; karty rulety s množstvím > 1 mají oranžový badge „×N"; výherní hláška zní „You won 3× X!" (u 1 kusu beze změny „You won a X!").
+**Ověřeno:** `tsc --noEmit` bez chyb; dev server (Vite) renderuje login bez chyb v server logu i konzoli. Funkční scénář (nastavit zvyku odměnu s „Pieces per win" 5 → výhra v ruletě připíše 5 kusů do `available`/stash) je za přihlášením + Supabase daty — k ručnímu doověření majitelem dle kroků výše.
 
 ### S12 — (DB) Snowball / postupně rostoucí zvyky + podcviky
 **Soubory:** `shared/schema.ts`, `habit-form.tsx`, `habits-page.tsx`, nové komponenty
