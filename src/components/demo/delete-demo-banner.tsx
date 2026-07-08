@@ -41,7 +41,6 @@ export function DeleteDemoBanner() {
         "goals",
         "habits",
         "rewards",
-        "stash",
         "habit_progress_today",
         "demo-data",
       ]) {

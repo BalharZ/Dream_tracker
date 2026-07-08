@@ -9,7 +9,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Link } from "wouter";
 import { Gift, Loader2 } from "lucide-react";
 import { Reward } from "@shared/schema";
 import { supabase } from "@/lib/supabase";
@@ -58,7 +57,6 @@ export function QuickRewards() {
     },
     onSuccess: (_data, { amount }) => {
       queryClient.invalidateQueries({ queryKey: ["rewards"] });
-      queryClient.invalidateQueries({ queryKey: ["stash"] });
       toast({
         title: "Reward selected!",
         description: `You redeemed ${amount} reward${amount > 1 ? "s" : ""}. Enjoy!`,
@@ -71,16 +69,11 @@ export function QuickRewards() {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Gift className="h-5 w-5 text-primary" />
           Your Rewards
         </CardTitle>
-        <Link href="/stash">
-          <Button variant="link" className="h-auto p-0 text-sm">
-            View stash
-          </Button>
-        </Link>
       </CardHeader>
       <CardContent>
         {isLoading ? (

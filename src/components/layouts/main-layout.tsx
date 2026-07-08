@@ -2,16 +2,22 @@ import { useAuth } from "@/hooks/use-auth";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Capacitor } from "@capacitor/core";
 import {
   LayoutDashboard,
   Star,
   Target,
   Repeat2,
   Gift,
-  Trophy,
   CalendarDays,
   LogOut,
+  RefreshCw,
+  Download,
 } from "lucide-react";
+
+// Served from public/ by Vercel; the native shell loads the live site so the
+// download button only makes sense in a regular browser.
+const ANDROID_APK_URL = "/DreamTracker.apk";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -20,7 +26,6 @@ const navigation = [
   { name: "Rewards", href: "/rewards", icon: Gift },
   { name: "Habits", href: "/habits", icon: Repeat2 },
   { name: "Calendar", href: "/calendar", icon: CalendarDays },
-  { name: "Stash", href: "/stash", icon: Trophy },
 ];
 
 export default function MainLayout({
@@ -60,7 +65,15 @@ export default function MainLayout({
           ))}
         </nav>
 
-        <div className="p-4 border-t">
+        <div className="p-4 border-t space-y-1">
+          {!Capacitor.isNativePlatform() && (
+            <Button variant="ghost" className="w-full justify-start" asChild>
+              <a href={ANDROID_APK_URL} download="DreamTracker.apk">
+                <Download className="mr-2 h-5 w-5" />
+                Get Android app
+              </a>
+            </Button>
+          )}
           <Button
             variant="ghost"
             className="w-full justify-start"
@@ -78,15 +91,42 @@ export default function MainLayout({
         <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
           Dream Tracker
         </h1>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => logoutMutation.mutate()}
-          disabled={logoutMutation.isPending}
-          aria-label="Logout"
-        >
-          <LogOut className="h-5 w-5" />
-        </Button>
+        <div className="flex items-center">
+          {/* Browser only: download the Android APK. */}
+          {!Capacitor.isNativePlatform() && (
+            <Button variant="ghost" size="icon" asChild>
+              <a
+                href={ANDROID_APK_URL}
+                download="DreamTracker.apk"
+                aria-label="Get Android app"
+                title="Get Android app"
+              >
+                <Download className="h-5 w-5" />
+              </a>
+            </Button>
+          )}
+          {/* Native app only: reload the WebView to pull the latest deploy. */}
+          {Capacitor.isNativePlatform() && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => window.location.reload()}
+              aria-label="Check for updates"
+              title="Check for updates"
+            >
+              <RefreshCw className="h-5 w-5" />
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => logoutMutation.mutate()}
+            disabled={logoutMutation.isPending}
+            aria-label="Logout"
+          >
+            <LogOut className="h-5 w-5" />
+          </Button>
+        </div>
       </header>
 
       {/* Mobile Bottom Navigation */}

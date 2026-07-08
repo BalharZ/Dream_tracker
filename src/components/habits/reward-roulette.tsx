@@ -147,7 +147,6 @@ export function RewardRoulette({
                   console.error('Error claiming reward:', error);
                 } else {
                   queryClient.invalidateQueries({ queryKey: ["rewards"] });
-                  queryClient.invalidateQueries({ queryKey: ["stash"] });
                 }
               });
           }
