@@ -17,9 +17,16 @@ type AuthContextType = {
   user: AuthUser | null;
   isLoading: boolean;
   error: Error | null;
+  // True after the user opens a password-reset link (Supabase PASSWORD_RECOVERY
+  // event). While true the app shows the "set a new password" screen.
+  passwordRecovery: boolean;
   loginMutation: UseMutationResult<AuthUser, Error, LoginData>;
   logoutMutation: UseMutationResult<void, Error, void>;
   registerMutation: UseMutationResult<AuthUser, Error, RegisterData>;
+  // Emails a password-reset link to the given address.
+  resetPasswordMutation: UseMutationResult<void, Error, string>;
+  // Sets a new password (used on the recovery screen).
+  updatePasswordMutation: UseMutationResult<void, Error, string>;
 };
 
 type LoginData = { email: string; password: string };
@@ -45,6 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
   const isRegisteringRef = useRef(false);
 
   useEffect(() => {
@@ -57,7 +65,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // Opening the emailed reset link signs the user in with a recovery
+      // session and fires this event — switch the UI to "set a new password".
+      if (event === "PASSWORD_RECOVERY") setPasswordRecovery(true);
       if (isRegisteringRef.current) return;
       const newUser = session?.user ? toAuthUser(session.user) : null;
       setUser((prev) => {
@@ -142,8 +153,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
+  const resetPasswordMutation = useMutation({
+    mutationFn: async (rawEmail: string) => {
+      // Same old-username fallback as login (e.g. "demo" → "demo@dreamtracker.app").
+      const email = rawEmail.includes("@")
+        ? rawEmail
+        : `${rawEmail}@dreamtracker.app`;
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin,
+      });
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Check your email",
+        description: "We sent you a link to reset your password.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Couldn't send reset email", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updatePasswordMutation = useMutation({
+    mutationFn: async (password: string) => {
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      setPasswordRecovery(false);
+      toast({ title: "Password updated", description: "You're all set." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Couldn't update password", description: error.message, variant: "destructive" });
+    },
+  });
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, error, loginMutation, logoutMutation, registerMutation }}>
+    <AuthContext.Provider value={{ user, isLoading, error, passwordRecovery, loginMutation, logoutMutation, registerMutation, resetPasswordMutation, updatePasswordMutation }}>
       {children}
     </AuthContext.Provider>
   );

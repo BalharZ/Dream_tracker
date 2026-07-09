@@ -91,12 +91,17 @@ function AuthTabs() {
 
 function LoginForm() {
   const { loginMutation } = useAuth();
+  const [showReset, setShowReset] = useState(false);
   const form = useForm({
     defaultValues: {
       email: "",
       password: "",
     },
   });
+
+  if (showReset) {
+    return <ForgotPasswordForm onBack={() => setShowReset(false)} />;
+  }
 
   return (
     <form
@@ -132,6 +137,66 @@ function LoginForm() {
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
         )}
         Login
+      </Button>
+
+      <Button
+        type="button"
+        variant="link"
+        className="w-full h-auto p-0 text-sm text-muted-foreground"
+        onClick={() => setShowReset(true)}
+      >
+        Forgot your password?
+      </Button>
+    </form>
+  );
+}
+
+function ForgotPasswordForm({ onBack }: { onBack: () => void }) {
+  const { resetPasswordMutation } = useAuth();
+  const form = useForm({ defaultValues: { email: "" } });
+
+  return (
+    <form
+      onSubmit={form.handleSubmit(({ email }) =>
+        resetPasswordMutation.mutate(email, { onSuccess: onBack })
+      )}
+      className="space-y-4 mt-4"
+    >
+      <div className="space-y-1">
+        <h2 className="text-lg font-semibold">Reset password</h2>
+        <p className="text-sm text-muted-foreground">
+          Enter your email and we'll send you a link to set a new password.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="reset-email">Email</Label>
+        <Input
+          id="reset-email"
+          type="email"
+          {...form.register("email")}
+          placeholder="Enter your email"
+        />
+      </div>
+
+      <Button
+        type="submit"
+        className="w-full"
+        disabled={resetPasswordMutation.isPending}
+      >
+        {resetPasswordMutation.isPending && (
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+        )}
+        Send reset link
+      </Button>
+
+      <Button
+        type="button"
+        variant="link"
+        className="w-full h-auto p-0 text-sm text-muted-foreground"
+        onClick={onBack}
+      >
+        Back to login
       </Button>
     </form>
   );
@@ -209,5 +274,54 @@ function RegisterForm() {
         Register
       </Button>
     </form>
+  );
+}
+
+// Shown full-screen after the user follows a password-reset link (recovery
+// session active). Rendered from App when `passwordRecovery` is true.
+export function UpdatePasswordScreen() {
+  const { updatePasswordMutation } = useAuth();
+  const form = useForm({ defaultValues: { password: "" } });
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center p-4">
+      <Card className="w-full max-w-md p-6">
+        <div className="space-y-2 mb-6">
+          <h1 className="text-2xl font-bold">Set a new password</h1>
+          <p className="text-muted-foreground">
+            Choose a new password for your account.
+          </p>
+        </div>
+        <form
+          onSubmit={form.handleSubmit(({ password }) =>
+            updatePasswordMutation.mutate(password)
+          )}
+          className="space-y-4"
+        >
+          <div className="space-y-2">
+            <Label htmlFor="new-password">New password</Label>
+            <Input
+              id="new-password"
+              type="password"
+              minLength={6}
+              required
+              {...form.register("password")}
+              placeholder="Choose a password (min 6 characters)"
+            />
+          </div>
+
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={updatePasswordMutation.isPending}
+          >
+            {updatePasswordMutation.isPending && (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            )}
+            Update password
+          </Button>
+        </form>
+      </Card>
+    </div>
   );
 }
