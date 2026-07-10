@@ -157,7 +157,7 @@ function HabitsPage() {
     timeout: NodeJS.Timeout | null;
   } | null>(null);
 
-  const handleHabitProgress = async (habitId: number, value: number, date: string) => {
+  const handleHabitProgress = async (habitId: number, value: number, date: string, target?: number) => {
     const habit = habits?.find(h => h.id === habitId);
     if (!habit) return;
 
@@ -167,8 +167,13 @@ function HabitsPage() {
 
     updateProgress.mutate({ habitId, value, date });
 
+    // For sub-exercise habits the day's value is the number of completed units,
+    // so the dialog passes the unit count as the win threshold instead of the
+    // stored target_value (which no longer maps to the value).
+    const threshold = target ?? habit.target_value;
+
     const timeout = setTimeout(() => {
-      if (value >= habit.target_value) {
+      if (threshold > 0 && value >= threshold) {
         const habitRewards = rewards?.filter(r => {
           try {
             const chances = JSON.parse(r.habit_chances || "{}");
@@ -422,9 +427,9 @@ function HabitsPage() {
           habit={selectedHabit}
           date={selectedDate}
           initialValue={progressMap[selectedHabit.id]?.[format(selectedDate, "yyyy-MM-dd")] || 0}
-          onSave={(value) => {
+          onSave={(value, target) => {
             const dateStr = format(selectedDate, "yyyy-MM-dd");
-            handleHabitProgress(selectedHabit.id, value, dateStr);
+            handleHabitProgress(selectedHabit.id, value, dateStr, target);
             setEditProgressDialogOpen(false);
           }}
           onEditHabit={() => {
@@ -451,7 +456,7 @@ function EditProgressDialog({
   habit: Habit;
   date: Date;
   initialValue: number;
-  onSave: (value: number) => void;
+  onSave: (value: number, target?: number) => void;
   onEditHabit?: () => void;
 }) {
   const [value, setValue] = useState<number | string>(initialValue > 0 ? initialValue : '');
@@ -545,9 +550,10 @@ function EditProgressDialog({
         .upsert(rows, { onConflict: "subitem_id,user_id,date" });
       if (error) console.error("Error saving sub-exercise progress:", error);
       queryClient.invalidateQueries({ queryKey: ["habit_subitem_progress"] });
-      onSave(doneCount);
+      // Win threshold for a sub-exercise habit is "all units done".
+      onSave(doneCount, units.length);
     } else {
-      onSave(typeof value === "string" ? 0 : value);
+      onSave(typeof value === "string" ? 0 : value, habit.target_value);
     }
   };
 

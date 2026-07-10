@@ -1055,12 +1055,12 @@ export function HabitForm({
                           aria-label="Sub-exercise target"
                         />
                         <Select
-                          value={s.or_group != null ? String(s.or_group) : "and"}
+                          value={s.or_group != null ? "or" : "and"}
                           onValueChange={(value) =>
                             setSubitems((prev) =>
                               prev.map((row, idx) =>
                                 idx === i
-                                  ? { ...row, or_group: value === "and" ? null : parseInt(value) }
+                                  ? { ...row, or_group: value === "and" ? null : 1 }
                                   : row
                               )
                             )
@@ -1074,9 +1074,7 @@ export function HabitForm({
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="and">AND</SelectItem>
-                            <SelectItem value="1">OR 1</SelectItem>
-                            <SelectItem value="2">OR 2</SelectItem>
-                            <SelectItem value="3">OR 3</SelectItem>
+                            <SelectItem value="or">OR</SelectItem>
                           </SelectContent>
                         </Select>
                         <Button
@@ -1094,11 +1092,10 @@ export function HabitForm({
                       </div>
                     ))}
                     <p className="text-xs text-muted-foreground">
-                      Sub-exercises are filled one by one when logging a day. AND = required
-                      individually; rows sharing the same OR group form a cluster where
-                      completing any one of them counts (e.g. 5 push-ups OR 5 squats).
-                      The day's habit value becomes the number of completed items
-                      (AND rows + OR clusters), so set the target accordingly.
+                      Sub-exercises are filled one by one when logging a day. AND = must be
+                      completed to earn the reward; OR = all rows marked OR form one group where
+                      completing any single one is enough (e.g. 5 push-ups OR 5 squats). The
+                      reward triggers once every AND row and the OR group are done.
                     </p>
                   </div>
                 )}

@@ -39,19 +39,21 @@ export function RewardRoulette({
   // Measure real card/container sizes so the winning card lands exactly under
   // the orange line on any screen width (previously a hardcoded -5730px that
   // only matched desktop, so mobile pointed at the wrong card).
+  const measureTarget = () => {
+    const container = containerRef.current;
+    const card = winningCardRef.current;
+    if (!container || !card) return;
+    const containerWidth = container.clientWidth;
+    const cardCenter = card.offsetLeft + card.offsetWidth / 2;
+    setTargetTranslate(Math.round(containerWidth / 2 - cardCenter));
+  };
+
+  // Keep it centered on resize / orientation change once open.
   useLayoutEffect(() => {
     if (!show) return;
-    const measure = () => {
-      const container = containerRef.current;
-      const card = winningCardRef.current;
-      if (!container || !card) return;
-      const containerWidth = container.clientWidth;
-      const cardCenter = card.offsetLeft + card.offsetWidth / 2;
-      setTargetTranslate(Math.round(containerWidth / 2 - cardCenter));
-    };
-    measure();
-    window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
+    measureTarget();
+    window.addEventListener("resize", measureTarget);
+    return () => window.removeEventListener("resize", measureTarget);
   }, [show, rewardCards]);
 
   useEffect(() => {
@@ -126,6 +128,9 @@ export function RewardRoulette({
       setRewardCards(cards);
 
       setTimeout(() => {
+        // The cards are in the DOM by now; measure the exact resting offset so
+        // the winning card stops under the line (reliable on mobile too).
+        measureTarget();
         setAnimationPhase('spinning');
         setTimeout(() => {
           setAnimationPhase('finished');
