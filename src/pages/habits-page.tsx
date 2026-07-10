@@ -18,6 +18,7 @@ import { recomputeProgress } from "@/lib/progress";
 import { applySnowballGrowth } from "@/lib/snowball";
 import { buildUnits, countDoneUnits, isUnitDone, escalationDue, snoozeEscalation } from "@/lib/habit-clusters";
 import { computeStreak, isConsolidated, CONSOLIDATION_DAYS } from "@/lib/streaks";
+import { syncHabitReminders } from "@/lib/local-notifications";
 
 type ProgressMap = Record<number, Record<string, number>>;
 
@@ -49,6 +50,12 @@ function HabitsPage() {
         if (changed) queryClient.invalidateQueries({ queryKey: ["habits"] });
       })
       .catch((error) => console.error("Error applying snowball growth:", error));
+  }, [habits]);
+
+  // Native app only: keep the on-device daily reminders in sync with the
+  // habits that want one (covers reinstall and edits from other devices).
+  useEffect(() => {
+    if (habits) syncHabitReminders(habits);
   }, [habits]);
 
   useEffect(() => {

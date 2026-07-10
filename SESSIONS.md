@@ -26,6 +26,9 @@
 - [x] S15 (DB) Kalendář + export do Google/Apple ✅
 - [x] S16 (DB/infra) Push notifikace + čas u zvyku + obsah z snu ✅
 - [x] S17 (native) Widget na plochu telefonu ✅
+- [x] S18 (native) Appka loaduje živý web (auto-update) + tlačítko stažení APK ✅
+- [x] S19 Reset hesla při loginu ✅
+- [x] S20 (native) Notifikace v mobilní appce — lokální notifikace ✅
 
 ---
 
@@ -283,6 +286,19 @@
 3. **Nativní widget (Java, `android/.../widget/`):** `HabitsWidgetProvider` (AppWidgetProvider) + `HabitsWidgetService` (RemoteViewsFactory; HTTP synchronně na binder threadu) + `WidgetApi` (čtení configu + PostgREST RPC přes HttpURLConnection) + layouty `widget_habits`/`widget_habit_item`, drawables (tmavé zaoblené pozadí, fialový kroužek / zelené ✓), `xml/widget_info.xml`, registrace v manifestu. Widget = ListView dnešních zvyků (název + „hodnota / target jednotka"), **tap na kroužek = splnit zvyk bez otevření appky** (broadcast → goAsync vlákno → `widget_complete_habit` → refresh listu), ⟳ = ruční refresh, tap na titulek/prázdný stav otevře appku, auto-update à 30 min. Pozn.: u zvyků s podcviky/snowball zapíše hlavní hodnotu = target (stejné chování jako rychlé „✓" na dashboardu).
 4. **APK zbuildováno:** `android/app/build/outputs/apk/debug/app-debug.apk` (4,4 MB; gradle `assembleDebug` BUILD SUCCESSFUL, 108 tasků). Rebuild po změnách webu: `npm run build; npx cap sync android; cd android; .\gradlew.bat assembleDebug` (env: `ANDROID_HOME=%LOCALAPPDATA%\Android\Sdk`, `JAVA_HOME=C:\Program Files\Microsoft\jdk-17`; `android/local.properties` s sdk.dir je vytvořen, gitignored).
 **Ověřeno:** `tsc --noEmit` bez chyb; web dev server renderuje login čistě (konzole bez chyb — widget kód je v prohlížeči neaktivní); gradle build prošel; SQL aplikováno a obě RPC otestovány přes REST. **Instalace na telefon (ruční krok majitele):** přenést `app-debug.apk` do telefonu → povolit instalaci z neznámých zdrojů → nainstalovat → otevřít „Dream Tracker" a přihlásit se (tím se widgetu předá token) → dlouhý stisk na ploše → Widgety → Dream Tracker → přidat. Pak tap na kroužek u zvyku zapíše splnění dneška rovnou z plochy; ověř v appce/na webu, že se den zapsal a po otevření appky se přepočítá progres cíle/snu.
+
+### S20 — (native) Notifikace v mobilní appce
+**Soubory:** `src/lib/local-notifications.ts` (nový), `src/components/habits/habit-form.tsx`, `src/pages/habits-page.tsx`, `@capacitor/local-notifications`
+**Pokrývá bod:** v Android appce (Capacitor WebView) šlo zapnutí připomínky do erroru „Subscription failed".
+**Příčina:** web push (`src/lib/push.ts`) v Android WebView nefunguje — není push service, takže `pushManager.subscribe()` hodí výjimku. Web push v prohlížeči (S16) funguje dál beze změny.
+**Řešení:** v nativní appce se místo web pushe plánují **lokální notifikace** na zařízení (`@capacitor/local-notifications`), bez Firebase.
+
+✅ **Hotovo (2026-07-10)**:
+1. **`src/lib/local-notifications.ts`:** `isNativeApp()` (Capacitor.isNativePlatform), `ensureNotificationPermission()` (Android 13+ POST_NOTIFICATIONS), `scheduleHabitReminder(habit)` (denní notifikace v `notify_time`, `schedule.on {hour,minute}` + `allowWhileIdle`, id = habit.id, tělo = ✨ pozitivní / ⚠️ negativní motivace), `cancelHabitReminder(id)`, `syncHabitReminders(habits)` (sladí naplánované s habity, které chtějí připomínku). V prohlížeči vše no-op.
+2. **`habit-form.tsx`:** toggle „Reminder" v nativní appce žádá OS permission (místo web push); `createHabit.onSuccess` naplánuje/zruší připomínku dle `notify`/`notify_time`; `deleteHabit.onSuccess` ji zruší.
+3. **`habits-page.tsx`:** `useEffect` volá `syncHabitReminders(habits)` při načtení (pokryje reinstalaci a úpravy z jiných zařízení).
+4. **APK rebuildováno** (`gradlew assembleDebug`, plugin `@capacitor/local-notifications@6.1.3` zkompilován, manifest má POST_NOTIFICATIONS + RECEIVE_BOOT_COMPLETED) a zkopírováno do `public/DreamTracker.apk` (8,7 MB) — servíruje se přes tlačítko stažení.
+**Ověřeno:** `tsc && vite build` bez chyb; gradle BUILD SUCCESSFUL; merged manifest obsahuje POST_NOTIFICATIONS + RECEIVE_BOOT_COMPLETED; web dev server renderuje čistě (nativní kód je v prohlížeči no-op). **Ruční krok majitele:** po deployi na Vercel znovu stáhnout a **přeinstalovat** APK (nový plugin je jen v nové APK), pak zvyk → Reminder + čas → povolit notifikace; ověřit, že v daný čas přijde notifikace.
 
 ---
 

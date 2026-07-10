@@ -40,6 +40,12 @@ import { getChance, getQuantity, makeChanceEntry, parseHabitChances } from "@/li
 import { increaseSnowballNow } from "@/lib/snowball";
 import { escalationDue, snoozeEscalation } from "@/lib/habit-clusters";
 import { ensurePushSubscription } from "@/lib/push";
+import {
+  isNativeApp,
+  ensureNotificationPermission,
+  scheduleHabitReminder,
+  cancelHabitReminder,
+} from "@/lib/local-notifications";
 
 // Editable sub-exercise row; id is set for rows loaded from the DB.
 // or_group: OR cluster number (null = required individually / AND).
@@ -392,6 +398,14 @@ export function HabitForm({
       return newHabit;
     },
     onSuccess: (newHabit) => {
+      // Native app: (re)schedule or cancel the on-device daily reminder to
+      // match the saved habit. No-op in the browser (web push handles it).
+      if (newHabit.notify && newHabit.notify_time) {
+        scheduleHabitReminder(newHabit);
+      } else {
+        cancelHabitReminder(newHabit.id);
+      }
+
       queryClient.invalidateQueries({ queryKey: ["habits"] });
       queryClient.invalidateQueries({ queryKey: ["rewards"] });
       queryClient.invalidateQueries({ queryKey: ["habit_subitems"] });
@@ -442,6 +456,7 @@ export function HabitForm({
       }
     },
     onSuccess: () => {
+      if (habit) cancelHabitReminder(habit.id);
       queryClient.invalidateQueries({ queryKey: ["habits"] });
       queryClient.invalidateQueries({ queryKey: ["rewards"] });
       toast({
@@ -930,8 +945,23 @@ export function HabitForm({
                       const checked = e.target.checked;
                       form.setValue("notify", checked);
                       if (!checked || !user) return;
-                      // Subscribe this browser right away — the click is the
-                      // user gesture the permission prompt needs.
+                      // Native app: web push doesn't work in the WebView, so
+                      // ask for the OS notification permission now (the click is
+                      // the gesture the prompt needs). The reminder itself is
+                      // scheduled on save, once the habit id + time are known.
+                      if (isNativeApp()) {
+                        const granted = await ensureNotificationPermission();
+                        if (!granted) {
+                          toast({
+                            title: "Notifications blocked",
+                            description:
+                              "Allow notifications for Dream Tracker in your phone's app settings to get reminders.",
+                            variant: "destructive",
+                          });
+                        }
+                        return;
+                      }
+                      // Browser: subscribe this browser right away.
                       const result = await ensurePushSubscription(user.id);
                       if (result === "denied") {
                         toast({
