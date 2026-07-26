@@ -1,5 +1,6 @@
 import { Capacitor } from "@capacitor/core";
 import { LocalNotifications } from "@capacitor/local-notifications";
+import { supabase } from "@/lib/supabase";
 import type { Habit } from "@shared/schema";
 
 // S20: native reminders for the Android app. Web push (src/lib/push.ts) does
@@ -77,22 +78,78 @@ function reminderIds(habitId: number): number[] {
   return Array.from({ length: REMINDER_DAYS }, (_, i) => base + i);
 }
 
-function notificationBody(habit: Pick<Habit, "positive_motivation" | "negative_motivation">): string {
+// The motivation shown in the reminder. Mirrors the web-push Edge Function:
+// prefer the linked dream's motivation, fall back to the habit's, then to the
+// dream name, then a generic line.
+type HabitContent = {
+  positive: string | null;
+  negative: string | null;
+  dreamName: string | null;
+};
+
+function notificationBody(content: HabitContent | undefined): string {
   const lines = [
-    habit.positive_motivation ? `✨ ${habit.positive_motivation}` : null,
-    habit.negative_motivation ? `⚠️ ${habit.negative_motivation}` : null,
+    content?.positive ? `✨ ${content.positive}` : null,
+    content?.negative ? `⚠️ ${content.negative}` : null,
   ].filter(Boolean) as string[];
+  if (lines.length === 0 && content?.dreamName) {
+    lines.push(`Keep working towards: ${content.dreamName}`);
+  }
   return lines.join("\n") || "Time to work on your habit.";
+}
+
+/**
+ * Resolve the reminder content (motivation + dream name) for a set of habits by
+ * following habit → goal → dream, in as few queries as possible. The dream's
+ * motivation wins over the habit's, matching the browser push.
+ */
+async function resolveContent(habits: Habit[]): Promise<Map<number, HabitContent>> {
+  const map = new Map<number, HabitContent>();
+
+  const goalIds = Array.from(
+    new Set(habits.map((h) => h.goal_id).filter((id): id is number => id != null)),
+  );
+  const goalById = new Map<number, { id: number; dream_id: number }>();
+  if (goalIds.length) {
+    const { data } = await supabase.from("goals").select("id, dream_id").in("id", goalIds);
+    for (const g of data || []) goalById.set(g.id, g);
+  }
+
+  const dreamIds = Array.from(
+    new Set(Array.from(goalById.values()).map((g) => g.dream_id)),
+  );
+  const dreamById = new Map<
+    number,
+    { name: string; positive_motivation: string | null; negative_motivation: string | null }
+  >();
+  if (dreamIds.length) {
+    const { data } = await supabase
+      .from("dreams")
+      .select("id, name, positive_motivation, negative_motivation")
+      .in("id", dreamIds);
+    for (const d of data || []) dreamById.set(d.id, d);
+  }
+
+  for (const h of habits) {
+    const goal = h.goal_id != null ? goalById.get(h.goal_id) : undefined;
+    const dream = goal ? dreamById.get(goal.dream_id) : undefined;
+    map.set(h.id, {
+      positive: dream?.positive_motivation || h.positive_motivation,
+      negative: dream?.negative_motivation || h.negative_motivation,
+      dreamName: dream?.name ?? null,
+    });
+  }
+  return map;
 }
 
 // Build the next REMINDER_DAYS one-shot exact notifications for a habit, skipping
 // any slot whose time has already passed today.
-function buildHabitNotifications(habit: Habit) {
+function buildHabitNotifications(habit: Habit, content: HabitContent | undefined) {
   const { hour, minute } = parseTime(habit.notify_time);
   const base = habit.id * 100;
   const now = Date.now();
   const title = `⏰ ${habit.name}`;
-  const body = notificationBody(habit);
+  const body = notificationBody(content);
   const notifications = [];
   for (let i = 0; i < REMINDER_DAYS; i++) {
     const at = new Date();
@@ -103,32 +160,42 @@ function buildHabitNotifications(habit: Habit) {
       id: base + i,
       title,
       body,
+      // BigText style: the notification expands to show the full motivation.
+      largeBody: body,
+      summaryText: content?.dreamName ?? undefined,
+      iconColor: habit.color,
       schedule: { at, allowWhileIdle: true },
     });
   }
   return notifications;
 }
 
-/**
- * Schedule (or reschedule) the daily reminders for one habit on the device.
- * No-op in the browser. Safe to call on every save — it cancels this habit's
- * existing reminders first, then lays down a fresh rolling buffer of exact
- * one-shot notifications.
- */
-export async function scheduleHabitReminder(habit: Habit): Promise<void> {
-  if (!isNativeApp()) return;
+// Cancel + reschedule one habit's rolling buffer. Assumes permission is granted.
+async function scheduleOne(habit: Habit, content: HabitContent | undefined): Promise<void> {
   await cancelHabitReminder(habit.id);
-
-  const granted = await ensureNotificationPermission();
-  if (!granted) return;
-
-  const notifications = buildHabitNotifications(habit);
+  const notifications = buildHabitNotifications(habit, content);
   if (notifications.length === 0) return;
   try {
     await LocalNotifications.schedule({ notifications });
   } catch (err) {
     console.error("Scheduling local notification failed:", err);
   }
+}
+
+/**
+ * Schedule (or reschedule) the daily reminders for one habit on the device.
+ * No-op in the browser. Safe to call on every save — it cancels this habit's
+ * existing reminders first, then lays down a fresh rolling buffer of exact
+ * one-shot notifications carrying the dream's motivation.
+ */
+export async function scheduleHabitReminder(habit: Habit): Promise<void> {
+  if (!isNativeApp()) return;
+
+  const granted = await ensureNotificationPermission();
+  if (!granted) return;
+
+  const content = await resolveContent([habit]);
+  await scheduleOne(habit, content.get(habit.id));
 }
 
 /** Cancel all device reminders for one habit. No-op in the browser. */
@@ -171,12 +238,13 @@ export async function syncHabitReminders(habits: Habit[]): Promise<void> {
       await LocalNotifications.cancel({ notifications: stale.map((id) => ({ id })) });
     }
 
-    // Re-lay the rolling buffer for every habit that wants reminders.
+    // Re-lay the rolling buffer for every habit that wants reminders. Resolve
+    // the dream motivation for all of them in one batch first.
     if (await ensureNotificationPermission()) {
-      for (const habit of habits) {
-        if (habit.notify && habit.notify_time) {
-          await scheduleHabitReminder(habit);
-        }
+      const wantedHabits = habits.filter((h) => h.notify && h.notify_time);
+      const contentMap = await resolveContent(wantedHabits);
+      for (const habit of wantedHabits) {
+        await scheduleOne(habit, contentMap.get(habit.id));
       }
     }
   } catch (err) {
