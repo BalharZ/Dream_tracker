@@ -8,6 +8,8 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 
 import org.json.JSONObject;
 
+import java.io.File;
+
 /**
  * JS-callable bridge for the picture-capable habit reminders. Registered in
  * {@link com.dreamtracker.app.MainActivity}. The web layer detects it via
@@ -32,11 +34,28 @@ public class HabitReminderPlugin extends Plugin {
                 long atMillis = n.getLong("atMillis");
                 String title = n.optString("title", "");
                 String body = n.optString("body", "");
-                String imageUrl = n.optString("imageUrl", "");
+                final String imageUrl = n.optString("imageUrl", "");
                 int hour = n.optInt("hour", 8);
                 int minute = n.optInt("minute", 0);
+
+                // Pre-cache the image to a stable local file now, so the receiver
+                // just reads it from disk at fire time (no network wait).
+                final File imageFile = ReminderImages.cacheFile(getContext(), id);
                 HabitReminderScheduler.scheduleExact(
-                    getContext(), id, atMillis, title, body, imageUrl, hour, minute);
+                    getContext(), id, atMillis, title, body, imageUrl,
+                    imageFile.getAbsolutePath(), hour, minute);
+
+                if (ReminderImages.isHttp(imageUrl)) {
+                    new Thread(new Runnable() {
+                        @Override
+                        public void run() {
+                            ReminderImages.download(imageUrl, imageFile);
+                        }
+                    }).start();
+                } else if (imageFile.exists()) {
+                    // Image was removed → drop the stale cache.
+                    imageFile.delete();
+                }
             }
             call.resolve();
         } catch (Exception e) {

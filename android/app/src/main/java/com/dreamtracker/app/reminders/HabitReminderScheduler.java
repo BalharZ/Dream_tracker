@@ -23,6 +23,7 @@ public class HabitReminderScheduler {
     public static final String EXTRA_TITLE = "title";
     public static final String EXTRA_BODY = "body";
     public static final String EXTRA_IMAGE = "imageUrl";
+    public static final String EXTRA_IMAGE_PATH = "imagePath";
     public static final String EXTRA_HOUR = "hour";
     public static final String EXTRA_MINUTE = "minute";
 
@@ -48,12 +49,13 @@ public class HabitReminderScheduler {
     }
 
     private static PendingIntent buildPendingIntent(Context ctx, int id, int flags,
-            String title, String body, String imageUrl, int hour, int minute) {
+            String title, String body, String imageUrl, String imagePath, int hour, int minute) {
         Intent i = new Intent(ctx, HabitReminderReceiver.class);
         i.putExtra(EXTRA_ID, id);
         i.putExtra(EXTRA_TITLE, title);
         i.putExtra(EXTRA_BODY, body);
         i.putExtra(EXTRA_IMAGE, imageUrl);
+        i.putExtra(EXTRA_IMAGE_PATH, imagePath);
         i.putExtra(EXTRA_HOUR, hour);
         i.putExtra(EXTRA_MINUTE, minute);
         return PendingIntent.getBroadcast(ctx, id, i, piFlags(flags));
@@ -61,11 +63,11 @@ public class HabitReminderScheduler {
 
     /** Schedule an exact wake-up alarm for one habit. */
     public static void scheduleExact(Context ctx, int id, long atMillis,
-            String title, String body, String imageUrl, int hour, int minute) {
+            String title, String body, String imageUrl, String imagePath, int hour, int minute) {
         AlarmManager am = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
         if (am == null) return;
         PendingIntent pi = buildPendingIntent(
-            ctx, id, PendingIntent.FLAG_UPDATE_CURRENT, title, body, imageUrl, hour, minute);
+            ctx, id, PendingIntent.FLAG_UPDATE_CURRENT, title, body, imageUrl, imagePath, hour, minute);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             try {
                 am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, atMillis, pi);
