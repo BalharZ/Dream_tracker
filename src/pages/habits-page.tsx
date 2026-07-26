@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Habit, Goal, Reward } from "@shared/schema";
+import { Habit, HabitSubitem, Goal, Reward } from "@shared/schema";
 import { supabase } from "@/lib/supabase";
 import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
@@ -12,6 +12,7 @@ import { ChevronRight, Flame, Medal, StickyNote, TrendingUp } from "lucide-react
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { HabitForm } from "@/components/habits/habit-form";
+import { NumberStepper } from "@/components/ui/number-stepper";
 import { RewardRoulette } from "@/components/habits/reward-roulette";
 import { recomputeProgress } from "@/lib/progress";
 import { applySnowballGrowth } from "@/lib/snowball";
@@ -469,8 +470,72 @@ function EditProgressDialog({
     }
   }, [initialValue, isOpen]);
 
+  // Sub-exercises: named counters that all add up toward the habit's single
+  // target. e.g. target 5 → 5 push-ups is enough; 5 push-ups + 5 squats = 10.
+  const { data: subitems } = useQuery({
+    queryKey: ["habit_subitems", habit.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("habit_subitems")
+        .select("*")
+        .eq("habit_id", habit.id)
+        .order("position", { ascending: true })
+        .order("id", { ascending: true });
+      if (error) throw error;
+      return data as HabitSubitem[];
+    },
+    enabled: isOpen,
+  });
+
+  const { data: subitemDayValues } = useQuery({
+    queryKey: ["habit_subitem_progress", habit.id, dateStr],
+    queryFn: async () => {
+      const ids = (subitems || []).map((s) => s.id);
+      const { data, error } = await supabase
+        .from("habit_subitem_progress")
+        .select("subitem_id, value")
+        .eq("date", dateStr)
+        .in("subitem_id", ids);
+      if (error) throw error;
+      const map: Record<number, number> = {};
+      (data || []).forEach((p) => {
+        map[p.subitem_id] = p.value;
+      });
+      return map;
+    },
+    enabled: isOpen && !!subitems && subitems.length > 0,
+  });
+
+  const [subValues, setSubValues] = useState<Record<number, number | string>>({});
+  useEffect(() => {
+    setSubValues(subitemDayValues || {});
+  }, [subitemDayValues, isOpen, dateStr]);
+
+  const hasSubitems = !!subitems && subitems.length > 0;
+  const subNumeric = (id: number) => {
+    const v = subValues[id];
+    return typeof v === "string" ? Number(v) || 0 : v || 0;
+  };
+  const subitemTotal = (subitems || []).reduce((acc, s) => acc + subNumeric(s.id), 0);
+
   const handleSave = async () => {
-    onSave(typeof value === "string" ? 0 : value, habit.target_value);
+    if (hasSubitems) {
+      const rows = subitems!.map((s) => ({
+        subitem_id: s.id,
+        user_id: habit.user_id,
+        date: dateStr,
+        value: subNumeric(s.id),
+      }));
+      const { error } = await supabase
+        .from("habit_subitem_progress")
+        .upsert(rows, { onConflict: "subitem_id,user_id,date" });
+      if (error) console.error("Error saving sub-exercise progress:", error);
+      queryClient.invalidateQueries({ queryKey: ["habit_subitem_progress"] });
+      // The habit's day value is the sum of all sub-exercises.
+      onSave(subitemTotal, habit.target_value);
+    } else {
+      onSave(typeof value === "string" ? 0 : value, habit.target_value);
+    }
   };
 
   return (
@@ -502,7 +567,37 @@ function EditProgressDialog({
             </p>
           )}
 
-          {(
+          {hasSubitems ? (
+            <div className="space-y-2">
+              {subitems!.map((s) => (
+                <div
+                  key={s.id}
+                  className="flex items-center gap-2 rounded-md border p-2"
+                >
+                  <div className="min-w-0 flex-1 truncate text-sm font-medium">
+                    {s.name}
+                  </div>
+                  <NumberStepper
+                    min={0}
+                    value={subValues[s.id] ?? 0}
+                    onChange={(v) =>
+                      setSubValues((prev) => ({ ...prev, [s.id]: v }))
+                    }
+                    className="w-32 shrink-0"
+                    inputClassName="h-9"
+                    buttonClassName="h-9 w-9"
+                    aria-label={`${s.name} value`}
+                  />
+                  <span className="text-xs text-muted-foreground w-10 shrink-0 truncate">
+                    {habit.unit}
+                  </span>
+                </div>
+              ))}
+              <p className="text-sm font-medium">
+                Total: {subitemTotal} / {habit.target_value} {habit.unit}
+              </p>
+            </div>
+          ) : (
             <div className="flex items-center space-x-2">
               <Input
                 type="number"

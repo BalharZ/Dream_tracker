@@ -13,6 +13,7 @@ import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { recomputeProgress } from "@/lib/progress";
 import { applySnowballGrowth } from "@/lib/snowball";
+import { syncHabitReminders } from "@/lib/local-notifications";
 import { RewardRoulette } from "@/components/habits/reward-roulette";
 
 /**
@@ -96,6 +97,13 @@ export function TodayHabits() {
         if (changed) queryClient.invalidateQueries({ queryKey: ["habits"] });
       })
       .catch((error) => console.error("Error applying snowball growth:", error));
+  }, [habits]);
+
+  // Native app only: top up the rolling buffer of exact daily reminders. The
+  // dashboard is the landing page, so this keeps reminders fresh even if the
+  // user never opens the Habits page.
+  useEffect(() => {
+    if (habits) syncHabitReminders(habits);
   }, [habits]);
 
   // Local, editable copy of today's values keyed by habit id.

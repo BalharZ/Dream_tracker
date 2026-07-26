@@ -1018,6 +1018,61 @@ export function HabitForm({
                 </p>
               </div>
 
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <FormLabel>Sub-exercises (optional)</FormLabel>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setSubitems((prev) => [...prev, { name: "", target: 1, or_group: null }])
+                    }
+                  >
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Add sub-exercise
+                  </Button>
+                </div>
+                {subitems.length > 0 && (
+                  <div className="space-y-2 border p-3 rounded-md">
+                    {subitems.map((s, i) => (
+                      <div key={s.id ?? `new-${i}`} className="flex items-center gap-2">
+                        <Input
+                          placeholder="e.g. Push-ups"
+                          value={s.name}
+                          className="flex-1"
+                          onChange={(e) =>
+                            setSubitems((prev) =>
+                              prev.map((row, idx) =>
+                                idx === i ? { ...row, name: e.target.value } : row
+                              )
+                            )
+                          }
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-9 w-9 shrink-0"
+                          onClick={() =>
+                            setSubitems((prev) => prev.filter((_, idx) => idx !== i))
+                          }
+                          aria-label="Remove sub-exercise"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    <p className="text-xs text-muted-foreground">
+                      Optional. Each sub-exercise is a different way to reach the target.
+                      When you log a day you enter how many of each you did and they add up
+                      toward the target above (e.g. target 5: 5 push-ups is enough; 5 push-ups
+                      + 5 squats counts as 10).
+                    </p>
+                  </div>
+                )}
+              </div>
+
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <FormLabel>Rewards</FormLabel>

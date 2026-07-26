@@ -35,20 +35,22 @@ function parseTime(time: string | null): { hour: number; minute: number } {
   return { hour: Number(h) || 8, minute: Number(m) || 0 };
 }
 
-/**
- * The next Date at hh:mm. If that time already passed today, use tomorrow.
- * Scheduling with an explicit `at` date (instead of `on: { hour, minute }`)
- * gives Android exact-alarm behaviour — the `on` form is delivered inexactly
- * and can slip by hours (fires whenever the device next wakes in the morning).
- */
-function nextOccurrence(hour: number, minute: number): Date {
-  const now = new Date();
-  const next = new Date();
-  next.setHours(hour, minute, 0, 0);
-  if (next.getTime() <= now.getTime()) {
-    next.setDate(next.getDate() + 1);
-  }
-  return next;
+// How many days of reminders to pre-schedule per habit.
+//
+// Why not a single repeating notification: @capacitor/local-notifications only
+// schedules *repeating* alarms (`every` / `on`) as INEXACT on Android, so a
+// daily reminder slips by hours and gets delivered whenever the device next
+// wakes (the "set 1:00, arrived 8:30" bug). One-shot notifications with an
+// explicit `at` date + `allowWhileIdle` use setExactAndAllowWhileIdle, which is
+// exact. So we pre-schedule a rolling buffer of one-shot exact notifications
+// (one per day) and top it up every time the app opens (syncHabitReminders).
+const REMINDER_DAYS = 14;
+
+// Notification ids for a habit's rolling buffer: habitId*100 + dayOffset. Serial
+// habit ids keep these well inside Android's 32-bit id range.
+function reminderIds(habitId: number): number[] {
+  const base = habitId * 100;
+  return Array.from({ length: REMINDER_DAYS }, (_, i) => base + i);
 }
 
 function notificationBody(habit: Pick<Habit, "positive_motivation" | "negative_motivation">): string {
@@ -59,10 +61,35 @@ function notificationBody(habit: Pick<Habit, "positive_motivation" | "negative_m
   return lines.join("\n") || "Time to work on your habit.";
 }
 
+// Build the next REMINDER_DAYS one-shot exact notifications for a habit, skipping
+// any slot whose time has already passed today.
+function buildHabitNotifications(habit: Habit) {
+  const { hour, minute } = parseTime(habit.notify_time);
+  const base = habit.id * 100;
+  const now = Date.now();
+  const title = `⏰ ${habit.name}`;
+  const body = notificationBody(habit);
+  const notifications = [];
+  for (let i = 0; i < REMINDER_DAYS; i++) {
+    const at = new Date();
+    at.setHours(hour, minute, 0, 0);
+    at.setDate(at.getDate() + i);
+    if (at.getTime() <= now) continue; // today's slot already passed
+    notifications.push({
+      id: base + i,
+      title,
+      body,
+      schedule: { at, allowWhileIdle: true },
+    });
+  }
+  return notifications;
+}
+
 /**
- * Schedule (or reschedule) the daily reminder for one habit on the device.
- * No-op in the browser. Safe to call on every save — it cancels any existing
- * notification with the same id first.
+ * Schedule (or reschedule) the daily reminders for one habit on the device.
+ * No-op in the browser. Safe to call on every save — it cancels this habit's
+ * existing reminders first, then lays down a fresh rolling buffer of exact
+ * one-shot notifications.
  */
 export async function scheduleHabitReminder(habit: Habit): Promise<void> {
   if (!isNativeApp()) return;
@@ -71,35 +98,22 @@ export async function scheduleHabitReminder(habit: Habit): Promise<void> {
   const granted = await ensureNotificationPermission();
   if (!granted) return;
 
-  const { hour, minute } = parseTime(habit.notify_time);
+  const notifications = buildHabitNotifications(habit);
+  if (notifications.length === 0) return;
   try {
-    await LocalNotifications.schedule({
-      notifications: [
-        {
-          id: habit.id,
-          title: `⏰ ${habit.name}`,
-          body: notificationBody(habit),
-          schedule: {
-            // Exact daily reminder: fire at the next hh:mm and repeat every day.
-            // `allowWhileIdle` asks Android to fire even in Doze.
-            at: nextOccurrence(hour, minute),
-            repeats: true,
-            every: "day",
-            allowWhileIdle: true,
-          },
-        },
-      ],
-    });
+    await LocalNotifications.schedule({ notifications });
   } catch (err) {
     console.error("Scheduling local notification failed:", err);
   }
 }
 
-/** Cancel the device reminder for one habit. No-op in the browser. */
+/** Cancel all device reminders for one habit. No-op in the browser. */
 export async function cancelHabitReminder(habitId: number): Promise<void> {
   if (!isNativeApp()) return;
   try {
-    await LocalNotifications.cancel({ notifications: [{ id: habitId }] });
+    // Include the legacy single id (habitId) used before the rolling buffer.
+    const ids = [habitId, ...reminderIds(habitId)];
+    await LocalNotifications.cancel({ notifications: ids.map((id) => ({ id })) });
   } catch (err) {
     console.error("Cancelling local notification failed:", err);
   }
@@ -107,16 +121,25 @@ export async function cancelHabitReminder(habitId: number): Promise<void> {
 
 /**
  * Sync device reminders to the current set of habits. Called on native app
- * start so reminders survive reinstall/reboot and reflect edits made on other
- * devices. Cancels reminders for habits that no longer want one.
+ * start so reminders survive reinstall/reboot, reflect edits made on other
+ * devices, and — importantly — so the rolling buffer of exact one-shot
+ * notifications is topped up before it runs out.
  */
 export async function syncHabitReminders(habits: Habit[]): Promise<void> {
   if (!isNativeApp()) return;
   try {
     const pending = await LocalNotifications.getPending();
-    const wanted = new Set(habits.filter((h) => h.notify && h.notify_time).map((h) => h.id));
+    // All notification ids that the current habits legitimately own.
+    const wanted = new Set<number>();
+    for (const h of habits) {
+      if (h.notify && h.notify_time) {
+        for (const id of reminderIds(h.id)) wanted.add(id);
+      }
+    }
 
-    // Drop reminders whose habit no longer wants one.
+    // Drop any pending reminder that isn't wanted anymore (habit deleted, its
+    // reminder turned off, or a legacy single-id notification from an older
+    // build).
     const stale = pending.notifications
       .map((n) => n.id)
       .filter((id) => !wanted.has(id));
@@ -124,7 +147,7 @@ export async function syncHabitReminders(habits: Habit[]): Promise<void> {
       await LocalNotifications.cancel({ notifications: stale.map((id) => ({ id })) });
     }
 
-    // (Re)schedule the wanted ones.
+    // Re-lay the rolling buffer for every habit that wants reminders.
     if (await ensureNotificationPermission()) {
       for (const habit of habits) {
         if (habit.notify && habit.notify_time) {
