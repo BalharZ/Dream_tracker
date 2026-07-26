@@ -43,6 +43,7 @@ import { ensurePushSubscription } from "@/lib/push";
 import {
   isNativeApp,
   ensureNotificationPermission,
+  ensureExactAlarmPermission,
   scheduleHabitReminder,
   cancelHabitReminder,
 } from "@/lib/local-notifications";
@@ -966,6 +967,18 @@ export function HabitForm({
                             title: "Notifications blocked",
                             description:
                               "Allow notifications for Dream Tracker in your phone's app settings to get reminders.",
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+                        // Also make sure exact alarms are allowed so the reminder
+                        // fires on time (sends the user to the OS screen if not).
+                        const exact = await ensureExactAlarmPermission();
+                        if (!exact) {
+                          toast({
+                            title: "Reminders may be delayed",
+                            description:
+                              "Allow “Alarms & reminders” for Dream Tracker so notifications fire at the exact time.",
                             variant: "destructive",
                           });
                         }

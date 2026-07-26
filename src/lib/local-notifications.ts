@@ -30,6 +30,30 @@ export async function ensureNotificationPermission(): Promise<boolean> {
   }
 }
 
+/**
+ * Make sure the app is allowed to schedule EXACT alarms so timed reminders fire
+ * on the minute (not batched to the morning). On Android 12+ this is a special
+ * permission; if it isn't granted we send the user straight to the system
+ * screen that toggles it — so nobody has to hunt through settings.
+ *
+ * Returns true if exact alarms are allowed (or the OS/plugin doesn't gate them,
+ * in which case they're allowed by default).
+ */
+export async function ensureExactAlarmPermission(): Promise<boolean> {
+  if (!isNativeApp()) return true;
+  try {
+    const status = await LocalNotifications.checkExactNotificationSetting();
+    if (status.exact_alarm === "granted") return true;
+    // Not granted yet → open the OS screen for it and read the result back.
+    const changed = await LocalNotifications.changeExactNotificationSetting();
+    return changed.exact_alarm === "granted";
+  } catch (err) {
+    // Older Android or a plugin without the API: exact alarms aren't gated.
+    console.error("Exact alarm setting check failed:", err);
+    return true;
+  }
+}
+
 function parseTime(time: string | null): { hour: number; minute: number } {
   const [h, m] = (time || "08:00").split(":");
   return { hour: Number(h) || 8, minute: Number(m) || 0 };
