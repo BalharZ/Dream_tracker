@@ -12,6 +12,7 @@ import GoalsPage from "@/pages/goals-page";
 import HabitsPage from "@/pages/habits-page";
 import RewardsPage from "@/pages/rewards-page";
 import CalendarPage from "@/pages/calendar-page";
+import SettingsPage from "@/pages/settings-page";
 import MainLayout from "./components/layouts/main-layout";
 
 function Router() {
@@ -24,6 +25,7 @@ function Router() {
       <ProtectedRoute path="/rewards" component={RewardsPage} />
       <ProtectedRoute path="/habits" component={HabitsPage} />
       <ProtectedRoute path="/calendar" component={CalendarPage} />
+      <ProtectedRoute path="/settings" component={SettingsPage} />
       <Route component={NotFound} />
     </Switch>
   );

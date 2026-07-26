@@ -4,19 +4,17 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Habit, HabitSubitem, Goal, Reward } from "@shared/schema";
+import { Habit, Goal, Reward } from "@shared/schema";
 import { supabase } from "@/lib/supabase";
 import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
-import { Check, ChevronRight, Flame, Medal, StickyNote, TrendingUp } from "lucide-react";
+import { ChevronRight, Flame, Medal, StickyNote, TrendingUp } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { HabitForm } from "@/components/habits/habit-form";
-import { NumberStepper } from "@/components/ui/number-stepper";
 import { RewardRoulette } from "@/components/habits/reward-roulette";
 import { recomputeProgress } from "@/lib/progress";
 import { applySnowballGrowth } from "@/lib/snowball";
-import { buildUnits, countDoneUnits, isUnitDone, escalationDue, snoozeEscalation } from "@/lib/habit-clusters";
 import { computeStreak, isConsolidated, CONSOLIDATION_DAYS } from "@/lib/streaks";
 import { syncHabitReminders } from "@/lib/local-notifications";
 
@@ -229,13 +227,14 @@ function HabitsPage() {
           onSuccess={() => {
             setHabitToEdit(null);
           }}
+          onClose={() => setHabitToEdit(null)}
           onDelete={habitToEdit ? () => deleteHabit.mutate(habitToEdit.id) : undefined}
         />
       </div>
 
-      <Card className="overflow-hidden">
+      <Card className="overflow-hidden -mx-6 rounded-none border-x-0 sm:mx-0 sm:rounded-lg sm:border-x">
         <CardContent className="p-0 sm:p-6">
-          <div className="flex items-center justify-between mb-4 px-4 pt-4 sm:px-0 sm:pt-0">
+          <div className="flex items-center justify-between mb-4 px-3 pt-4 sm:px-0 sm:pt-0">
             <h2 className="text-lg font-semibold">History</h2>
           </div>
 
@@ -246,7 +245,7 @@ function HabitsPage() {
               <div className="flex-shrink-0 border-r">
                 {/* Header row */}
                 <div className="flex border-b">
-                  <div className="w-28 sm:w-48 px-3 py-3 text-sm font-medium text-muted-foreground">Habit</div>
+                  <div className="w-44 sm:w-56 px-2 sm:px-3 py-3 text-sm font-medium text-muted-foreground">Habit</div>
                   <div className="w-14 sm:w-20 px-2 py-3 text-sm font-medium text-muted-foreground text-center">Target</div>
                 </div>
                 {/* Data rows */}
@@ -265,7 +264,7 @@ function HabitsPage() {
                       borderLeft: `4px solid ${habit.color}`
                     }}
                   >
-                    <div className="w-28 sm:w-48 px-3 py-3 flex items-center gap-1 min-w-0">
+                    <div className="w-44 sm:w-56 px-2 sm:px-3 py-3 flex items-center gap-1 min-w-0">
                       <Button
                         variant="link"
                         className="h-auto p-0 text-left min-w-0"
@@ -470,91 +469,8 @@ function EditProgressDialog({
     }
   }, [initialValue, isOpen]);
 
-  // Sub-exercises of this habit; when present they replace the single value
-  // input and the day's habit value becomes the number of completed ones.
-  const { data: subitems } = useQuery({
-    queryKey: ["habit_subitems", habit.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("habit_subitems")
-        .select("*")
-        .eq("habit_id", habit.id)
-        .order("position", { ascending: true })
-        .order("id", { ascending: true });
-      if (error) throw error;
-      return data as HabitSubitem[];
-    },
-    enabled: isOpen,
-  });
-
-  const { data: subitemDayValues } = useQuery({
-    queryKey: ["habit_subitem_progress", habit.id, dateStr],
-    queryFn: async () => {
-      const ids = (subitems || []).map((s) => s.id);
-      const { data, error } = await supabase
-        .from("habit_subitem_progress")
-        .select("subitem_id, value")
-        .eq("date", dateStr)
-        .in("subitem_id", ids);
-      if (error) throw error;
-      const map: Record<number, number> = {};
-      (data || []).forEach((p) => {
-        map[p.subitem_id] = p.value;
-      });
-      return map;
-    },
-    enabled: isOpen && !!subitems && subitems.length > 0,
-  });
-
-  const [subValues, setSubValues] = useState<Record<number, number | string>>({});
-  useEffect(() => {
-    setSubValues(subitemDayValues || {});
-  }, [subitemDayValues, isOpen, dateStr]);
-
-  const hasSubitems = !!subitems && subitems.length > 0;
-  const subNumeric = (id: number) => {
-    const v = subValues[id];
-    return typeof v === "string" ? Number(v) || 0 : v || 0;
-  };
-  // Units: standalone sub-exercises (AND) + OR clusters, each counting as 1.
-  const units = buildUnits(subitems || []);
-  const doneCount = countDoneUnits(units, subNumeric);
-
-  // Escalation offer (hidden locally after snoozing — the habit prop is stale
-  // until the habits query refetches).
-  const [escalationSnoozed, setEscalationSnoozed] = useState(false);
-  useEffect(() => {
-    setEscalationSnoozed(false);
-  }, [habit.id, isOpen]);
-  const showEscalation = escalationDue(habit) && !escalationSnoozed;
-  const handleSnoozeEscalation = async () => {
-    setEscalationSnoozed(true);
-    try {
-      await snoozeEscalation(habit.id);
-      queryClient.invalidateQueries({ queryKey: ["habits"] });
-    } catch (error) {
-      console.error("Error snoozing escalation:", error);
-    }
-  };
-
   const handleSave = async () => {
-    if (hasSubitems) {
-      const rows = subitems!.map((s) => ({
-        subitem_id: s.id,
-        user_id: habit.user_id,
-        date: dateStr,
-        value: subNumeric(s.id),
-      }));
-      const { error } = await supabase
-        .from("habit_subitem_progress")
-        .upsert(rows, { onConflict: "subitem_id,user_id,date" });
-      if (error) console.error("Error saving sub-exercise progress:", error);
-      queryClient.invalidateQueries({ queryKey: ["habit_subitem_progress"] });
-      // Win threshold for a sub-exercise habit is "all units done".
-      onSave(doneCount, units.length);
-    } else {
-      onSave(typeof value === "string" ? 0 : value, habit.target_value);
-    }
+    onSave(typeof value === "string" ? 0 : value, habit.target_value);
   };
 
   return (
@@ -569,9 +485,7 @@ function EditProgressDialog({
               {format(date, "EEEE, MMMM d, yyyy")}
             </span>
             <span className="text-sm text-muted-foreground">
-              Target: {hasSubitems
-                ? `${units.length} item${units.length === 1 ? "" : "s"}`
-                : `${habit.target_value} ${habit.unit}`}
+              Target: {habit.target_value} {habit.unit}
             </span>
           </div>
 
@@ -588,96 +502,7 @@ function EditProgressDialog({
             </p>
           )}
 
-          {showEscalation && (
-            <div className="rounded-md border border-amber-400 bg-amber-50 dark:bg-amber-950/30 p-2 space-y-2">
-              <p className="text-sm">
-                Time to escalate <span className="font-medium">{habit.name}</span> —
-                consider adding a sub-exercise or tightening an OR group.
-              </p>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" size="sm" onClick={handleSnoozeEscalation}>
-                  Later
-                </Button>
-                {onEditHabit && (
-                  <Button size="sm" onClick={onEditHabit}>
-                    Escalate (edit habit)
-                  </Button>
-                )}
-              </div>
-            </div>
-          )}
-
-          {hasSubitems ? (
-            <div className="space-y-2">
-              {units.map((unit) => {
-                const renderRow = (s: HabitSubitem) => {
-                  const done = subNumeric(s.id) >= (s.target || 1);
-                  return (
-                    <div
-                      key={s.id}
-                      className="flex items-center gap-2 rounded-md border p-2"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-medium">{s.name}</div>
-                        <div className="text-xs text-muted-foreground">
-                          Target: {s.target} {s.unit}
-                        </div>
-                      </div>
-                      {(s.target || 1) > 1 && (
-                        <NumberStepper
-                          min={0}
-                          value={subValues[s.id] ?? 0}
-                          onChange={(v) =>
-                            setSubValues((prev) => ({ ...prev, [s.id]: v }))
-                          }
-                          className="w-32 shrink-0"
-                          inputClassName="h-9"
-                          buttonClassName="h-9 w-9"
-                          aria-label={`${s.name} value`}
-                        />
-                      )}
-                      <Button
-                        size="icon"
-                        variant={done ? "default" : "outline"}
-                        className="shrink-0"
-                        style={done ? { backgroundColor: habit.color } : undefined}
-                        onClick={() =>
-                          setSubValues((prev) => ({
-                            ...prev,
-                            [s.id]: done ? 0 : s.target || 1,
-                          }))
-                        }
-                        aria-label={`Toggle ${s.name} done`}
-                        title={done ? "Mark as not done" : "Mark as done"}
-                      >
-                        <Check className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  );
-                };
-
-                if (unit.kind === "single") return renderRow(unit.subitem);
-
-                const orDone = isUnitDone(unit, subNumeric);
-                return (
-                  <div
-                    key={`or-${unit.group}`}
-                    className={`space-y-2 rounded-md border border-dashed p-2 ${
-                      orDone ? "border-green-500" : ""
-                    }`}
-                  >
-                    <p className="text-xs font-medium text-muted-foreground">
-                      OR group — complete any one{orDone ? " ✓" : ""}
-                    </p>
-                    {unit.members.map(renderRow)}
-                  </div>
-                );
-              })}
-              <p className="text-sm text-muted-foreground">
-                Completed: {doneCount} / {units.length} item{units.length === 1 ? "" : "s"}
-              </p>
-            </div>
-          ) : (
+          {(
             <div className="flex items-center space-x-2">
               <Input
                 type="number"

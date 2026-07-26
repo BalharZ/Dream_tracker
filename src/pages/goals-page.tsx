@@ -25,7 +25,7 @@ import { supabase } from "@/lib/supabase";
 import { queryClient } from "@/lib/queryClient";
 import { recomputeProgress } from "@/lib/progress";
 import { Progress } from "@/components/ui/progress";
-import { Plus, Loader2, ChevronRight, Trash2 } from "lucide-react";
+import { Plus, Loader2, ChevronRight, Trash2, Pencil } from "lucide-react";
 import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
 import { useState, useEffect } from "react";
 
@@ -46,10 +46,16 @@ function GoalCard({ goal, dream, subgoals, onEdit, onDelete }: {
           <h3 className="text-xl font-semibold hover:text-primary cursor-pointer" onClick={() => onEdit(goal)}>
             {goal.name}
           </h3>
-          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); onDelete(goal); }}
-            className="h-8 w-8 text-muted-foreground hover:text-destructive">
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center shrink-0">
+            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); onEdit(goal); }}
+              className="h-8 w-8 text-muted-foreground hover:text-primary" title="Edit goal">
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); onDelete(goal); }}
+              className="h-8 w-8 text-muted-foreground hover:text-destructive" title="Delete goal">
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
         {dream && (
           <div className="flex items-center text-sm text-muted-foreground mb-4 cursor-pointer" onClick={() => onEdit(goal)}>
@@ -72,10 +78,10 @@ function GoalCard({ goal, dream, subgoals, onEdit, onDelete }: {
           <div className="mt-4 space-y-2">
             <h4 className="text-sm font-medium">Subgoals ({subgoals.length}):</h4>
             {subgoals.map((subgoal) => (
-              <div key={subgoal.id} className="text-sm flex flex-col" onClick={(e) => { e.stopPropagation(); onEdit(subgoal); }}>
+              <div key={subgoal.id} className="text-sm flex flex-col">
                 <div className="flex items-center mb-1">
                   <ChevronRight className="h-3 w-3 mr-1 flex-shrink-0" />
-                  <span className="hover:text-primary">{subgoal.name}</span>
+                  <span>{subgoal.name}</span>
                 </div>
                 <div className="flex justify-between pl-4">
                   <span>Target: {subgoal.final_count} {subgoal.unit}</span>

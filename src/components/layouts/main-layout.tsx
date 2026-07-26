@@ -10,9 +10,9 @@ import {
   Repeat2,
   Gift,
   CalendarDays,
-  LogOut,
   RefreshCw,
   Download,
+  Settings,
 } from "lucide-react";
 
 // Served from public/ by Vercel; the native shell loads the live site so the
@@ -33,7 +33,7 @@ export default function MainLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, logoutMutation } = useAuth();
+  const { user } = useAuth();
   const [location] = useLocation();
 
   if (!user) return <>{children}</>;
@@ -74,15 +74,18 @@ export default function MainLayout({
               </a>
             </Button>
           )}
-          <Button
-            variant="ghost"
-            className="w-full justify-start"
-            onClick={() => logoutMutation.mutate()}
-            disabled={logoutMutation.isPending}
-          >
-            <LogOut className="mr-2 h-5 w-5" />
-            Logout
-          </Button>
+          <Link href="/settings">
+            <Button
+              variant={location === "/settings" ? "default" : "ghost"}
+              className={cn(
+                "w-full justify-start",
+                location === "/settings" ? "bg-primary text-primary-foreground" : ""
+              )}
+            >
+              <Settings className="mr-2 h-5 w-5" />
+              Settings
+            </Button>
+          </Link>
         </div>
       </aside>
 
@@ -117,15 +120,16 @@ export default function MainLayout({
               <RefreshCw className="h-5 w-5" />
             </Button>
           )}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => logoutMutation.mutate()}
-            disabled={logoutMutation.isPending}
-            aria-label="Logout"
-          >
-            <LogOut className="h-5 w-5" />
-          </Button>
+          <Link href="/settings">
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Settings"
+              title="Settings"
+            >
+              <Settings className="h-5 w-5" />
+            </Button>
+          </Link>
         </div>
       </header>
 

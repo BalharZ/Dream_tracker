@@ -62,12 +62,16 @@ export function HabitForm({
   habit,
   onSuccess,
   onDelete,
+  onClose,
 }: {
   goals: Goal[];
   rewards: Reward[];
   habit: Habit | null;
   onSuccess: () => void;
   onDelete?: () => void;
+  // Called whenever the dialog closes without saving, so the parent can clear
+  // its "editing" state (otherwise the Add Habit button stays stuck on "Edit").
+  onClose?: () => void;
 }) {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -590,7 +594,13 @@ export function HabitForm({
         )}
       </Button>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) onClose?.();
+        }}
+      >
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{habit ? "Edit Habit" : "Create New Habit"}</DialogTitle>
@@ -1008,144 +1018,6 @@ export function HabitForm({
                 </p>
               </div>
 
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <FormLabel>Sub-exercises</FormLabel>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      setSubitems((prev) => [...prev, { name: "", target: 1, or_group: null }])
-                    }
-                  >
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Add sub-exercise
-                  </Button>
-                </div>
-                {subitems.length > 0 && (
-                  <div className="space-y-2 border p-3 rounded-md">
-                    {subitems.map((s, i) => (
-                      <div key={s.id ?? `new-${i}`} className="flex items-center gap-2">
-                        <Input
-                          placeholder="e.g. Push-ups"
-                          value={s.name}
-                          className="flex-1"
-                          onChange={(e) =>
-                            setSubitems((prev) =>
-                              prev.map((row, idx) =>
-                                idx === i ? { ...row, name: e.target.value } : row
-                              )
-                            )
-                          }
-                        />
-                        <NumberStepper
-                          min={0}
-                          value={s.target}
-                          onChange={(val) =>
-                            setSubitems((prev) =>
-                              prev.map((row, idx) =>
-                                idx === i ? { ...row, target: val } : row
-                              )
-                            )
-                          }
-                          className="w-28 shrink-0"
-                          inputClassName="h-9"
-                          buttonClassName="h-9 w-9"
-                          aria-label="Sub-exercise target"
-                        />
-                        <Select
-                          value={s.or_group != null ? "or" : "and"}
-                          onValueChange={(value) =>
-                            setSubitems((prev) =>
-                              prev.map((row, idx) =>
-                                idx === i
-                                  ? { ...row, or_group: value === "and" ? null : 1 }
-                                  : row
-                              )
-                            )
-                          }
-                        >
-                          <SelectTrigger
-                            className="h-9 w-20 shrink-0"
-                            aria-label="AND / OR group"
-                          >
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="and">AND</SelectItem>
-                            <SelectItem value="or">OR</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-9 w-9 shrink-0"
-                          onClick={() =>
-                            setSubitems((prev) => prev.filter((_, idx) => idx !== i))
-                          }
-                          aria-label="Remove sub-exercise"
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                    <p className="text-xs text-muted-foreground">
-                      Sub-exercises are filled one by one when logging a day. AND = must be
-                      completed to earn the reward; OR = all rows marked OR form one group where
-                      completing any single one is enough (e.g. 5 push-ups OR 5 squats). The
-                      reward triggers once every AND row and the OR group are done.
-                    </p>
-                  </div>
-                )}
-
-                <div className="space-y-2 border p-3 rounded-md">
-                  <FormField
-                    control={form.control}
-                    name="escalation_days"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Offer escalation every (days)</FormLabel>
-                        <FormControl>
-                          <NumberStepper
-                            min={0}
-                            value={field.value ?? ""}
-                            onChange={field.onChange}
-                          />
-                        </FormControl>
-                        <p className="text-xs text-muted-foreground">
-                          0 = off. After this many days the app offers to escalate the
-                          habit — add a new sub-exercise or tighten an OR group. Adding
-                          a sub-exercise restarts the countdown.
-                        </p>
-                      </FormItem>
-                    )}
-                  />
-                  {habit && escalationDue(habit) && (
-                    <div className="flex items-center justify-between gap-2 rounded-md border border-amber-400 bg-amber-50 dark:bg-amber-950/30 p-2">
-                      <span className="text-sm">
-                        Escalation is due — add a sub-exercise above or tighten an OR
-                        group, then save.
-                      </span>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="shrink-0"
-                        disabled={snoozeEscalationNow.isPending}
-                        onClick={() => snoozeEscalationNow.mutate()}
-                      >
-                        {snoozeEscalationNow.isPending ? (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : null}
-                        Later
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <FormLabel>Rewards</FormLabel>
@@ -1355,7 +1227,10 @@ export function HabitForm({
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => setDialogOpen(false)}
+                  onClick={() => {
+                    setDialogOpen(false);
+                    onClose?.();
+                  }}
                 >
                   Cancel
                 </Button>

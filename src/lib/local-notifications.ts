@@ -35,6 +35,22 @@ function parseTime(time: string | null): { hour: number; minute: number } {
   return { hour: Number(h) || 8, minute: Number(m) || 0 };
 }
 
+/**
+ * The next Date at hh:mm. If that time already passed today, use tomorrow.
+ * Scheduling with an explicit `at` date (instead of `on: { hour, minute }`)
+ * gives Android exact-alarm behaviour — the `on` form is delivered inexactly
+ * and can slip by hours (fires whenever the device next wakes in the morning).
+ */
+function nextOccurrence(hour: number, minute: number): Date {
+  const now = new Date();
+  const next = new Date();
+  next.setHours(hour, minute, 0, 0);
+  if (next.getTime() <= now.getTime()) {
+    next.setDate(next.getDate() + 1);
+  }
+  return next;
+}
+
 function notificationBody(habit: Pick<Habit, "positive_motivation" | "negative_motivation">): string {
   const lines = [
     habit.positive_motivation ? `✨ ${habit.positive_motivation}` : null,
@@ -64,7 +80,11 @@ export async function scheduleHabitReminder(habit: Habit): Promise<void> {
           title: `⏰ ${habit.name}`,
           body: notificationBody(habit),
           schedule: {
-            on: { hour, minute },
+            // Exact daily reminder: fire at the next hh:mm and repeat every day.
+            // `allowWhileIdle` asks Android to fire even in Doze.
+            at: nextOccurrence(hour, minute),
+            repeats: true,
+            every: "day",
             allowWhileIdle: true,
           },
         },

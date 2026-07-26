@@ -2,7 +2,9 @@ import { createContext, ReactNode, useContext, useEffect, useRef, useState } fro
 import { useMutation, UseMutationResult } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { queryClient } from "@/lib/queryClient";
-import { seedDemoData, type DemoPreset } from "@/lib/seed-demo-data";
+// Demo data seeding is disabled for now — see DEMO.md. `seedDemoData` /
+// `DemoPreset` stay available for when the tutorial/demo flow is redesigned.
+// import { seedDemoData, type DemoPreset } from "@/lib/seed-demo-data";
 import { syncWidgetConfig, clearWidgetConfig } from "@/lib/widget-sync";
 import { useToast } from "@/hooks/use-toast";
 import type { User } from "@supabase/supabase-js";
@@ -30,7 +32,7 @@ type AuthContextType = {
 };
 
 type LoginData = { email: string; password: string };
-type RegisterData = { email: string; password: string; preset: DemoPreset };
+type RegisterData = { email: string; password: string };
 
 function toAuthUser(user: User): AuthUser {
   const email = user.email ?? user.id;
@@ -124,7 +126,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isRegisteringRef.current = false;
         throw new Error("Registration failed");
       }
-      await seedDemoData(data.user.id, credentials.preset).catch(() => {});
+      // Demo data seeding disabled for now (see DEMO.md). Re-enable when the
+      // tutorial/demo flow is redesigned:
+      // await seedDemoData(data.user.id, credentials.preset).catch(() => {});
       isRegisteringRef.current = false;
       return toAuthUser(data.user);
     },

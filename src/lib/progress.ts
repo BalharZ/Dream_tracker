@@ -62,29 +62,22 @@ export async function recomputeProgress(userId: string): Promise<void> {
 
   const clampPct = (n: number) => Math.max(0, Math.min(100, n));
 
-  const leafProgress = (goal: Goal): number => {
-    const fulfilled = fulfilledByGoal.get(goal.id) || 0;
-    if (!goal.final_count || goal.final_count <= 0) return 0;
-    return clampPct((fulfilled / goal.final_count) * 100);
+  // Absolute fulfilled amount for a goal in its own unit: the sum of habits
+  // linked directly to it plus everything fulfilled in its subgoals. This lets
+  // a parent goal count habits attached straight to it (not just the average of
+  // its subgoals). With no direct habits it reduces to the old weighted average,
+  // because a parent's final_count is the auto-sum of its subgoals' final_counts.
+  const absoluteFulfilled = (goal: Goal): number => {
+    const direct = fulfilledByGoal.get(goal.id) || 0;
+    const children = childrenByParent.get(goal.id) || [];
+    return direct + children.reduce((acc, c) => acc + absoluteFulfilled(c), 0);
   };
 
   const goalProgress = new Map<number, number>();
   const computeGoal = (goal: Goal): number => {
     if (goalProgress.has(goal.id)) return goalProgress.get(goal.id)!;
-    const children = childrenByParent.get(goal.id);
-    let result: number;
-    if (children && children.length > 0) {
-      // Weighted average of subgoals by their final_count.
-      const totalWeight = children.reduce((acc, c) => acc + (c.final_count > 0 ? c.final_count : 0), 0);
-      if (totalWeight > 0) {
-        result = children.reduce((acc, c) => acc + computeGoal(c) * (c.final_count > 0 ? c.final_count : 0), 0) / totalWeight;
-      } else {
-        result = children.reduce((acc, c) => acc + computeGoal(c), 0) / children.length;
-      }
-    } else {
-      result = leafProgress(goal);
-    }
-    result = clampPct(result);
+    const denom = goal.final_count > 0 ? goal.final_count : 0;
+    const result = denom > 0 ? clampPct((absoluteFulfilled(goal) / denom) * 100) : 0;
     goalProgress.set(goal.id, result);
     return result;
   };
