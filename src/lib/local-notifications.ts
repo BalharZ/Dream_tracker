@@ -21,12 +21,30 @@ type NativeReminder = {
 interface HabitReminderPlugin {
   schedule(options: { notifications: NativeReminder[] }): Promise<void>;
   cancel(options: { ids: number[] }): Promise<void>;
+  openExternal(options: { url: string }): Promise<void>;
 }
 const HabitReminder = registerPlugin<HabitReminderPlugin>("HabitReminder");
 
 // True when running in an APK that bundles the custom picture-capable plugin.
 function useNativeReminder(): boolean {
   return Capacitor.isNativePlatform() && Capacitor.isPluginAvailable("HabitReminder");
+}
+
+/**
+ * Open a URL in the system browser. In the native app the WebView can't trigger
+ * a file download itself, so we hand APK downloads to the OS browser via the
+ * plugin; everywhere else a normal new tab does the job.
+ */
+export async function openExternalUrl(url: string): Promise<void> {
+  if (useNativeReminder()) {
+    try {
+      await HabitReminder.openExternal({ url });
+      return;
+    } catch (err) {
+      console.error("openExternal failed:", err);
+    }
+  }
+  window.open(url, "_blank");
 }
 
 // S20: native reminders for the Android app. Web push (src/lib/push.ts) does

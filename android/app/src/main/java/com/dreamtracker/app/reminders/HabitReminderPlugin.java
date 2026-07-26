@@ -1,5 +1,8 @@
 package com.dreamtracker.app.reminders;
 
+import android.content.Intent;
+import android.net.Uri;
+
 import com.getcapacitor.JSArray;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -60,6 +63,28 @@ public class HabitReminderPlugin extends Plugin {
             call.resolve();
         } catch (Exception e) {
             call.reject("schedule failed: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Open a URL in the system browser (ACTION_VIEW). Used to download the
+     * latest APK — the WebView can't trigger the download itself, but the
+     * external browser can (and then Android offers to install it).
+     */
+    @PluginMethod
+    public void openExternal(PluginCall call) {
+        String url = call.getString("url");
+        if (url == null || url.isEmpty()) {
+            call.reject("url required");
+            return;
+        }
+        try {
+            Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(i);
+            call.resolve();
+        } catch (Exception e) {
+            call.reject("openExternal failed: " + e.getMessage());
         }
     }
 

@@ -2,6 +2,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Capacitor } from "@capacitor/core";
+import { openExternalUrl } from "@/lib/local-notifications";
 import { Download, LogOut, RefreshCw, Settings as SettingsIcon } from "lucide-react";
 
 // Served from public/ by Vercel; the native shell loads the live site so the
@@ -49,18 +50,38 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           {isNative ? (
-            <div className="space-y-1">
-              <Button
-                variant="outline"
-                className="w-full justify-start"
-                onClick={() => window.location.reload()}
-              >
-                <RefreshCw className="mr-2 h-5 w-5" />
-                Check for updates
-              </Button>
-              <p className="text-xs text-muted-foreground">
-                Reloads the app to pull the latest version.
-              </p>
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
+                  onClick={() => window.location.reload()}
+                >
+                  <RefreshCw className="mr-2 h-5 w-5" />
+                  Check for updates
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Reloads the app to pull the latest web version. Enough for most
+                  updates.
+                </p>
+              </div>
+              <div className="space-y-1">
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
+                  onClick={() =>
+                    openExternalUrl(`${window.location.origin}${ANDROID_APK_URL}`)
+                  }
+                >
+                  <Download className="mr-2 h-5 w-5" />
+                  Download latest app
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Opens your browser to download &amp; install the newest app.
+                  Needed only after updates that change the app itself (like
+                  notifications or the widget).
+                </p>
+              </div>
             </div>
           ) : (
             <div className="space-y-1">
