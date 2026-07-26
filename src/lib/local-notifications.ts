@@ -1,7 +1,33 @@
-import { Capacitor } from "@capacitor/core";
+import { Capacitor, registerPlugin } from "@capacitor/core";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { supabase } from "@/lib/supabase";
 import type { Habit } from "@shared/schema";
+
+// Custom native plugin (android/app/.../reminders/HabitReminderPlugin.java).
+// It schedules exact self-repeating alarms and, at fire time, posts a
+// notification with a BigPictureStyle image downloaded from the dream's URL —
+// something @capacitor/local-notifications can't do (it only supports text /
+// BigText). Only present in APKs built with the native code; older APKs fall
+// back to the text-only LocalNotifications path below.
+type NativeReminder = {
+  id: number;
+  atMillis: number;
+  title: string;
+  body: string;
+  imageUrl: string;
+  hour: number;
+  minute: number;
+};
+interface HabitReminderPlugin {
+  schedule(options: { notifications: NativeReminder[] }): Promise<void>;
+  cancel(options: { ids: number[] }): Promise<void>;
+}
+const HabitReminder = registerPlugin<HabitReminderPlugin>("HabitReminder");
+
+// True when running in an APK that bundles the custom picture-capable plugin.
+function useNativeReminder(): boolean {
+  return Capacitor.isNativePlatform() && Capacitor.isPluginAvailable("HabitReminder");
+}
 
 // S20: native reminders for the Android app. Web push (src/lib/push.ts) does
 // not work inside the Capacitor WebView — there is no push service, so
@@ -85,6 +111,7 @@ type HabitContent = {
   positive: string | null;
   negative: string | null;
   dreamName: string | null;
+  image: string | null;
 };
 
 function notificationBody(content: HabitContent | undefined): string {
@@ -120,12 +147,17 @@ async function resolveContent(habits: Habit[]): Promise<Map<number, HabitContent
   );
   const dreamById = new Map<
     number,
-    { name: string; positive_motivation: string | null; negative_motivation: string | null }
+    {
+      name: string;
+      image: string | null;
+      positive_motivation: string | null;
+      negative_motivation: string | null;
+    }
   >();
   if (dreamIds.length) {
     const { data } = await supabase
       .from("dreams")
-      .select("id, name, positive_motivation, negative_motivation")
+      .select("id, name, image, positive_motivation, negative_motivation")
       .in("id", dreamIds);
     for (const d of data || []) dreamById.set(d.id, d);
   }
@@ -137,6 +169,7 @@ async function resolveContent(habits: Habit[]): Promise<Map<number, HabitContent
       positive: dream?.positive_motivation || h.positive_motivation,
       negative: dream?.negative_motivation || h.negative_motivation,
       dreamName: dream?.name ?? null,
+      image: dream?.image || h.image || null,
     });
   }
   return map;
@@ -170,9 +203,37 @@ function buildHabitNotifications(habit: Habit, content: HabitContent | undefined
   return notifications;
 }
 
-// Cancel + reschedule one habit's rolling buffer. Assumes permission is granted.
+// Cancel + reschedule one habit's reminder. Assumes permission is granted.
+// Uses the picture-capable native plugin when the APK bundles it; otherwise
+// falls back to the text-only LocalNotifications rolling buffer.
 async function scheduleOne(habit: Habit, content: HabitContent | undefined): Promise<void> {
   await cancelHabitReminder(habit.id);
+
+  if (useNativeReminder()) {
+    const { hour, minute } = parseTime(habit.notify_time);
+    const at = new Date();
+    at.setHours(hour, minute, 0, 0);
+    if (at.getTime() <= Date.now()) at.setDate(at.getDate() + 1);
+    try {
+      await HabitReminder.schedule({
+        notifications: [
+          {
+            id: habit.id,
+            atMillis: at.getTime(),
+            title: `⏰ ${habit.name}`,
+            body: notificationBody(content),
+            imageUrl: content?.image || "",
+            hour,
+            minute,
+          },
+        ],
+      });
+    } catch (err) {
+      console.error("Scheduling native reminder failed:", err);
+    }
+    return;
+  }
+
   const notifications = buildHabitNotifications(habit, content);
   if (notifications.length === 0) return;
   try {
@@ -201,12 +262,21 @@ export async function scheduleHabitReminder(habit: Habit): Promise<void> {
 /** Cancel all device reminders for one habit. No-op in the browser. */
 export async function cancelHabitReminder(habitId: number): Promise<void> {
   if (!isNativeApp()) return;
+  // Always clear the LocalNotifications rolling buffer + legacy single id — this
+  // also cleans up reminders left by an older build after upgrading to the
+  // native-plugin path.
   try {
-    // Include the legacy single id (habitId) used before the rolling buffer.
     const ids = [habitId, ...reminderIds(habitId)];
     await LocalNotifications.cancel({ notifications: ids.map((id) => ({ id })) });
   } catch (err) {
     console.error("Cancelling local notification failed:", err);
+  }
+  if (useNativeReminder()) {
+    try {
+      await HabitReminder.cancel({ ids: [habitId] });
+    } catch (err) {
+      console.error("Cancelling native reminder failed:", err);
+    }
   }
 }
 

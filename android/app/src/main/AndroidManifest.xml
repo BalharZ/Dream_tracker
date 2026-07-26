@@ -41,6 +41,13 @@
             android:exported="false"
             android:permission="android.permission.BIND_REMOTEVIEWS" />
 
+        <!-- Custom picture-capable habit reminders: exact alarm fires this
+             receiver, which downloads the dream image and posts a
+             BigPictureStyle notification (see reminders/HabitReminderReceiver). -->
+        <receiver
+            android:name=".reminders.HabitReminderReceiver"
+            android:exported="false" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -55,6 +62,9 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Android 13+: required to post notifications (also merged by the
+         local-notifications plugin; declared here for the custom reminders). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- S20: exact daily habit reminders. Without an exact-alarm permission the
          local-notifications plugin falls back to an inexact alarm (setAndAllowWhileIdle),
