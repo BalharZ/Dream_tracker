@@ -1,7 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Expanded habit-reminder notification: dream image on top (full width),
-     then the title and the FULL motivation text. Wrapped by
-     DecoratedCustomViewStyle, which supplies the app-name/time/icon header. -->
+<!-- Expanded habit-reminder notification: dream image on top (as close to full
+     width as the decoration allows), then the title and the FULL motivation
+     text. Wrapped by DecoratedCustomViewStyle, which supplies the
+     app-name/time/icon header.
+     The image uses negative side margins to break out of the ~16dp content
+     padding so it reaches the notification edges; the text keeps a small inset
+     for readability. Image height is kept small so more text lines fit before
+     the system's max notification height clips them. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -10,18 +15,18 @@
     <ImageView
         android:id="@+id/notif_image"
         android:layout_width="match_parent"
-        android:layout_height="176dp"
+        android:layout_height="132dp"
+        android:layout_marginStart="-16dp"
+        android:layout_marginEnd="-16dp"
         android:layout_marginBottom="8dp"
         android:scaleType="centerCrop"
-        android:adjustViewBounds="true"
+        android:adjustViewBounds="false"
         android:contentDescription="@null" />
 
     <TextView
         android:id="@+id/notif_title"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginStart="4dp"
-        android:layout_marginEnd="4dp"
         android:textColor="?android:attr/textColorPrimary"
         android:textStyle="bold"
         android:textSize="15sp"
@@ -33,10 +38,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="2dp"
-        android:layout_marginStart="4dp"
-        android:layout_marginEnd="4dp"
-        android:layout_marginBottom="4dp"
         android:textColor="?android:attr/textColorSecondary"
         android:textSize="14sp"
-        android:maxLines="12" />
+        android:lineSpacingMultiplier="0.98"
+        android:maxLines="20" />
 </LinearLayout>
