@@ -269,13 +269,19 @@ function HabitsPage() {
                       <Button
                         variant="link"
                         className="h-auto p-0 text-left min-w-0"
-                        style={{ color: habit.color }}
+                        style={{ color: habit.name ? habit.color : undefined }}
                         onClick={(e) => {
                           e.stopPropagation();
                           setHabitToEdit(habit);
                         }}
                       >
-                        <div className="font-bold text-sm leading-tight truncate">{habit.name}</div>
+                        {habit.name ? (
+                          <div className="font-bold text-sm leading-tight truncate">{habit.name}</div>
+                        ) : (
+                          <div className="text-sm italic leading-tight truncate text-muted-foreground">
+                            (bez názvu – klikni pro úpravu)
+                          </div>
+                        )}
                       </Button>
                       {isConsolidated(streak) ? (
                         <span
@@ -306,7 +312,15 @@ function HabitsPage() {
                         </span>
                       )}
                     </div>
-                    <div className="w-14 sm:w-20 px-2 py-3 flex flex-col items-center justify-center" style={{ color: habit.color }}>
+                    <div
+                      className="w-14 sm:w-20 px-2 py-3 flex flex-col items-center justify-center cursor-pointer hover:bg-black/5"
+                      style={{ color: habit.color }}
+                      title="Klikni pro úpravu návyku"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setHabitToEdit(habit);
+                      }}
+                    >
                       <span className="text-base font-bold leading-tight flex items-center gap-0.5">
                         {habit.target_value}
                         {habit.habit_type === "snowball" && (
