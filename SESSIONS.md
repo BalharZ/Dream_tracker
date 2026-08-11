@@ -301,6 +301,16 @@
 5. **Oprava přesnosti (2. iterace):** notifikace nevystřelila včas, protože bez exact-alarm permission plugin (`setExactIfPossible`, LocalNotificationManager.java:380) na Androidu 12+ padá na `setAndAllowWhileIdle` = nepřesný alarm, který Doze odkládá. Do `android/app/src/main/AndroidManifest.xml` přidány `USE_EXACT_ALARM` (auto-granted, sideload APK mimo Play) + `SCHEDULE_EXACT_ALARM` (maxSdkVersion 32) → `canScheduleExactAlarms()` = true → `setExactAndAllowWhileIdle` střílí přesně na minutu. APK znovu rebuildováno.
 **Ověřeno:** `tsc && vite build` bez chyb; gradle BUILD SUCCESSFUL; merged manifest obsahuje POST_NOTIFICATIONS + RECEIVE_BOOT_COMPLETED; web dev server renderuje čistě (nativní kód je v prohlížeči no-op). **Ruční krok majitele:** po deployi na Vercel znovu stáhnout a **přeinstalovat** APK (nový plugin je jen v nové APK), pak zvyk → Reminder + čas → povolit notifikace; ověřit, že v daný čas přijde notifikace.
 
+### S31 — (native) Notifikace: širší obrázek + víc textu; parkování názvu/ikony
+**Soubory:** `android/app/src/main/res/layout/notif_reminder_big.xml`, `docs/NAMING.md`, `public/DreamTracker.apk`
+**Zadání:** v rozbalené notifikaci obrázek+text nešly na 100 % šířky a text se ořízl → co nejvíc textu; úvaha o přejmenování „Dream Tracker" (plete se se sny ze spánku) a změně ikony.
+
+✅ **Hotovo (2026-08-11)**:
+1. **Layout notifikace:** obrázku dán záporný boční margin (`-16dp`) proti odsazení `DecoratedCustomViewStyle` → táhne se k okrajům; výška snížena 176→132dp, aby zbylo místo na text; tělo `maxLines` 12→20 s těsnějším `lineSpacingMultiplier 0.98`, texty bez zbytečných bočních marginů. Nutno ověřit na telefonu (Samsung One UI si odsazení někdy hlídá).
+2. **APK rebuild** (`gradlew assembleDebug`, BUILD SUCCESSFUL, jen res-změna) → zkopírováno do `public/DreamTracker.apk` (servíruje „Download latest app").
+3. **Název + ikona parkovány:** nápady (Northstar/Vision Tracker/Momentum/Horizon, Summit+Ascend vyřazeny) a ASO úvaha (launcher label vs. Play title; appka teď není na Play, tak keyword nic neřeší) v `docs/NAMING.md`. Ikona se udělá až po rozhodnutí názvu, aby ladila.
+**Ověřeno:** gradle BUILD SUCCESSFUL; APK 8,84 MB pushnuto. **Ruční krok majitele:** stáhnout+přeinstalovat APK, počkat na notifikaci a zkontrolovat šířku obrázku a délku textu.
+
 ---
 
 ## Poznámky k závislostem
