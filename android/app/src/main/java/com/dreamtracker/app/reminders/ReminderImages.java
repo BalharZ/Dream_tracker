@@ -78,6 +78,16 @@ public class ReminderImages {
 
     /** Decode a cached file into a bitmap capped at MAX_DIM on the long edge. */
     public static Bitmap decode(File file) {
+        return decode(file, MAX_DIM, Bitmap.Config.ARGB_8888);
+    }
+
+    /**
+     * Decode a cached file capped at maxDim on the long edge with the given
+     * config. Custom RemoteViews notifications ship the bitmap across a ~1 MB
+     * Binder transaction, so those use a smaller size + RGB_565 to stay well
+     * under the limit.
+     */
+    public static Bitmap decode(File file, int maxDim, Bitmap.Config config) {
         if (file == null || !file.exists() || file.length() == 0) {
             return null;
         }
@@ -90,11 +100,12 @@ public class ReminderImages {
                 return null;
             }
             int sample = 1;
-            while (longEdge / sample > MAX_DIM) {
+            while (longEdge / sample > maxDim) {
                 sample *= 2;
             }
             BitmapFactory.Options opts = new BitmapFactory.Options();
             opts.inSampleSize = sample;
+            opts.inPreferredConfig = config;
             return BitmapFactory.decodeFile(file.getAbsolutePath(), opts);
         } catch (Throwable t) {
             return null;

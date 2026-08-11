@@ -6,17 +6,21 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.os.Build;
+import android.widget.RemoteViews;
 
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
+
+import com.dreamtracker.app.R;
 
 import java.io.File;
 import java.util.Calendar;
 
 /**
  * Fires at a habit's reminder time. Re-arms tomorrow's alarm (self-repeating),
- * then downloads the dream image off the main thread and posts a
- * BigPictureStyle notification (falling back to BigText when there's no image).
+ * then loads the pre-cached dream image off the main thread and posts a custom
+ * notification: image on top (full width) with the FULL motivation text below
+ * (falling back to BigText when there's no image).
  */
 public class HabitReminderReceiver extends BroadcastReceiver {
 
@@ -64,11 +68,13 @@ public class HabitReminderReceiver extends BroadcastReceiver {
 
         // Prefer the pre-downloaded local file; only hit the network if it's
         // missing (e.g. the pre-download hadn't finished / failed).
+        // Smaller RGB_565 bitmap: a custom RemoteViews ships the image across a
+        // ~1 MB Binder transaction, unlike BigPictureStyle which resizes for you.
         File file = imagePath != null ? new File(imagePath) : null;
-        Bitmap image = ReminderImages.decode(file);
+        Bitmap image = ReminderImages.decode(file, 640, Bitmap.Config.RGB_565);
         if (image == null && file != null && ReminderImages.isHttp(imageUrl)) {
             if (ReminderImages.download(imageUrl, file)) {
-                image = ReminderImages.decode(file);
+                image = ReminderImages.decode(file, 640, Bitmap.Config.RGB_565);
             }
         }
 
@@ -95,13 +101,14 @@ public class HabitReminderReceiver extends BroadcastReceiver {
         }
 
         if (image != null) {
-            b.setLargeIcon(image);
-            b.setStyle(
-                new NotificationCompat.BigPictureStyle()
-                    .bigPicture(image)
-                    .bigLargeIcon((Bitmap) null) // hide the thumbnail when expanded
-                    .setBigContentTitle(title)
-                    .setSummaryText(body));
+            // Custom expanded layout: image on top (full width), full text below.
+            RemoteViews big = new RemoteViews(ctx.getPackageName(), R.layout.notif_reminder_big);
+            big.setImageViewBitmap(R.id.notif_image, image);
+            big.setTextViewText(R.id.notif_title, title);
+            big.setTextViewText(R.id.notif_body, body);
+            b.setLargeIcon(image); // thumbnail in the collapsed view
+            b.setStyle(new NotificationCompat.DecoratedCustomViewStyle());
+            b.setCustomBigContentView(big);
         } else {
             b.setStyle(new NotificationCompat.BigTextStyle().bigText(body));
         }
