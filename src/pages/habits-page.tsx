@@ -212,7 +212,7 @@ function HabitsPage() {
   }
 
   return (
-    <div className="space-y-8 overflow-x-hidden">
+    <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold mb-2">Habits</h1>
