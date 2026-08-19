@@ -9,7 +9,6 @@ import {
   Target,
   Repeat2,
   Gift,
-  CalendarDays,
   RefreshCw,
   Download,
   Settings,
@@ -25,7 +24,6 @@ const navigation = [
   { name: "Goals", href: "/goals", icon: Target },
   { name: "Rewards", href: "/rewards", icon: Gift },
   { name: "Habits", href: "/habits", icon: Repeat2 },
-  { name: "Calendar", href: "/calendar", icon: CalendarDays },
 ];
 
 export default function MainLayout({
