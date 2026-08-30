@@ -23,11 +23,16 @@
         android:adjustViewBounds="false"
         android:contentDescription="@null" />
 
+    <!-- Text colours: DO NOT use ?android:attr/textColorPrimary here. In a custom
+         RemoteViews the theme attr resolves against the APP theme (light → black
+         text), not the notification shade (often dark) → unreadable black-on-dark.
+         The androidx TextAppearance.Compat.Notification.* styles are built for
+         custom notifications and pick a colour that contrasts with the shade. -->
     <TextView
         android:id="@+id/notif_title"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:textColor="?android:attr/textColorPrimary"
+        android:textAppearance="@style/TextAppearance.Compat.Notification.Title"
         android:textStyle="bold"
         android:textSize="15sp"
         android:maxLines="2"
@@ -38,7 +43,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="2dp"
-        android:textColor="?android:attr/textColorSecondary"
+        android:textAppearance="@style/TextAppearance.Compat.Notification.Line2"
         android:textSize="14sp"
         android:lineSpacingMultiplier="0.98"
         android:maxLines="20" />

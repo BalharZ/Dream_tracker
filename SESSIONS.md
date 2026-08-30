@@ -313,6 +313,65 @@
 
 ---
 
+### S32 — (native) Notifikace: čitelné pozadí/text (černý text na tmavé liště)
+**Soubory:** `android/app/src/main/res/layout/notif_reminder_big.xml`, `public/DreamTracker.apk`
+**Zadání:** v rozbalené notifikaci byl text nečitelný — černý text na tmavém (poloprůhledném) pozadí notifikační lišty.
+**Příčina:** custom RemoteViews layout používal `?android:attr/textColorPrimary`/`textColorSecondary`. Theme-atribut se v RemoteViews vyhodnotí proti **tématu appky** (světlé → černý text), ne proti pozadí notifikační lišty (tmavé) → černý text na tmavém = nečitelné.
+
+✅ **Hotovo (2026-08-30)**:
+1. **Layout:** `notif_title` → `android:textAppearance="@style/TextAppearance.Compat.Notification.Title"`, `notif_body` → `@style/TextAppearance.Compat.Notification.Line2`. Tyto androidx styly jsou stavěné přesně pro custom notifikace a barvu textu volí tak, aby kontrastovala s pozadím lišty (na tmavé liště → světlý text). Explicitní `textColor` odebrán.
+2. **APK rebuild** (`gradlew assembleDebug`, BUILD SUCCESSFUL 43 s, jen res-změna) → zkopírováno do `public/DreamTracker.apk` (8,84 MB).
+**Ověřeno:** gradle BUILD SUCCESSFUL. **Ruční krok majitele:** stáhnout+přeinstalovat APK, počkat na notifikaci a zkontrolovat, že text je čitelný na tmavé liště.
+
+---
+
+## Backlog — audit seznamu úprav (2026-08-30)
+
+> Audit seznamu 19 úprav od majitele proti aktuálnímu kódu. Legenda: ✅ hotovo · ⚠️ bug/regrese (kód existuje, ale nefunguje jak má) · ❌ nezačato (nová funkce). Body rozkouskované do samostatných budoucích sessionů (S33+) tak, aby každá byla nezávislá a šetřila tokeny — po resetu stačí říct číslo/název sessionu.
+
+### Rychlý audit (co je / není hotovo)
+| # | Bod | Stav | Session |
+|---|-----|------|---------|
+| 1 | Sosat free databázi obrázků přes API | ❌ nezačato | S41 |
+| 2 | Skupina zvyků: zobrazit sečtené hlavní číslo (5), ne „1 z podcílů" | ⚠️ | S35 |
+| 3 | Odměny řadit dle množství (víc = výš) — „už bylo, nefunguje" | ⚠️ (řadí se dle `available`+`created_at`, ne dle množství) | S38 |
+| 4 | Odstranit tab/podstránku Calendar | ✅ hotovo (commit a1cb3a1) | — |
+| 5 | Add reward: „browse" sloučit dovnitř jednoho „Add reward" | ❌ (2 tlačítka) | S38 |
+| 6 | Notifikace nestřílí v čase (appka i chrome); skáčou při připojení telefonu; duplicitní | ⚠️ | S33 |
+| 7 | Zvyk na mobilu utekl doleva za obrazovku | ⚠️ (layout overflow) | S34 |
+| 8 | Moc notifikací (chrome + appka) — vypnout web push, jen appka | ⚠️ | S33 |
+| 9 | Snowball: jak funguje + má i klesat, když se nevyplní | ❌ (růst je, decay není) | S37 |
+| 10 | Do tvorby odměn dostat obrázky (free databanka / google) | ❌ = duplicitní s #1 | S41 |
+| 11 | Odebrat poznámky (Notes) u nastavení zvyků | ❌ (pole `notes` stále v `habit-form.tsx`) | S40 |
+| 12 | Odebrat odkazy/„úpaty" z hlavičky (stačí v nastavení) | ❌ (nutno doupřesnit co přesně) | S40 |
+| 13 | Sjednotit zobrazení obrázků (rewards+dreams): full šířka, výška auto | ❌ | S39 |
+| 14 | Widget refresh tlačítko nefunguje | ⚠️ (ACTION_REFRESH je zadrátován, ladit) | S42 |
+| 15 | Shluky podcílů v habits zmizely (regrese) | ⚠️ | S35 |
+| 16 | Group zvyk: default vytažená klávesnice + plusko utíká pod rukou | ⚠️ | S34 |
+| 17 | Týdenní zvyk: Nx/týden, odměna po každém, na konci týdne speciální losování (diamant 10 %, volba odměny) | ❌ (jen daily/weekly select) | S43 |
+| 18 | Nefunguje propsání/uložení zvyků z dashboardu | ⚠️ (`today-habits.tsx` mutace existuje, ladit) | S36 |
+| 19 | Snowball: nespustí se výherní animace + target svítí 0 | ⚠️ | S37 |
+
+### Rozkouskovaný plán (priorita: nejdřív bugy/bolest, pak funkce)
+
+**P1 — bugy a bolest**
+- [ ] **S33 — Notifikace: jen z appky, vypnout web push, opravit timing/duplikáty** (#6, #8). Web push (`src/lib/push.ts`, `sw.js`, Edge Function) vypnout / odhlásit v prohlížeči; nechat jen nativní lokální notifikace (`src/lib/local-notifications.ts` + `android/.../reminders/`). Prověřit dvojité notifikace při přenastavení času a proč chrome střílí až při připojení telefonu.
+- [ ] **S34 — Habits mobil: overflow doleva + klávesnice/plus jumping** (#7, #16). Layout zvyku na mobilu neutíká za okraj; u group zvyku nevytahovat klávesnici defaultně (autofocus pryč), plus tlačítko nesmí skákat. Soubory: `src/pages/habits-page.tsx`, `src/components/habits/*`, `number-stepper.tsx`.
+- [ ] **S35 — Podcíle/shluky: regrese + součet hlavního čísla** (#2, #15). Shluky podcílů se přestaly zobrazovat — najít regresi; a místo „1 z podcílů" ukázat sečtené hlavní číslo (5 kliků = 5). Soubory: `src/lib/habit-clusters.ts`, `src/pages/habits-page.tsx`, `today-habits.tsx`.
+- [ ] **S36 — Dashboard: propsání/uložení zvyků** (#18). `src/components/habits/today-habits.tsx` — `updateProgress` mutace existuje, ale zápis se neprojeví; ladit save-timer/invalidate/kaskádu progresu.
+- [ ] **S37 — Snowball: decay + oprava animace/target 0 + dokumentace** (#9, #19). Přidat pokles targetu, když se zvyk nevyplní; opravit, proč se nespustí výherní animace a proč target v tabulce = 0. Doplnit stručný popis jak snowball funguje. Soubory: `src/lib/snowball.ts`, ruleta/animace v `reward-roulette.tsx`.
+
+**P2 — UI/UX a menší funkce**
+- [ ] **S38 — Rewards: řazení dle množství + sloučení Add/Browse do jednoho** (#3, #5). Řadit odměny dle počtu kusů (víc = výš); z „Add reward" udělat jediné tlačítko, kde je uvnitř volba „vytvořit vlastní" / „vybrat ze seznamu". Soubory: `src/pages/rewards-page.tsx`, `quick-rewards.tsx`.
+- [ ] **S39 — Obrázky: sjednotit zobrazení (full šířka, výška auto)** (#13). Rewards i dreams stejně: obrázek 100 % šířky, výška dle poměru. Soubory: `rewards-page.tsx`, `dreams-page.tsx`, `image-gallery.tsx`.
+- [ ] **S40 — Úklid: odebrat Notes u zvyku + odkazy z hlavičky** (#11, #12). Odstranit pole `notes` z `habit-form.tsx` (a schování v UI); vyčistit odkazy v hlavičce `main-layout.tsx` (nejdřív doupřesnit s majitelem, co přesně „úpaty").
+- [ ] **S42 — Widget: oprava refresh tlačítka** (#14). Nativní `ACTION_REFRESH` je zadrátován (`HabitsWidgetProvider.java`), ale refresh nefunguje — ladit + rebuild APK.
+
+**P3 — větší funkce**
+- [ ] **S41 — Obrázky přes free API (vyhledávání v tvorbě odměn/snů)** (#1, #10). Napojit free obrázkovou databanku (např. Unsplash/Pexels API — právně čisté, ne google images) do formuláře odměn a snů. Vyžaduje API klíč + řešení atribuce.
+- [ ] **S43 — Zvyky: týdenní frekvence (Nx/týden) + speciální týdenní losování** (#17). Zvyk lze splnit Nx za týden (např. posilovna 3× týdně); odměna po každém splnění; po dokončení celého týdne speciální losování se vzácnou (10 %) diamantovou odměnou, kterou si uživatel může zvolit. Největší bod, staví na rulety + frekvenci. Soubory: `habit-form.tsx`, `reward-roulette.tsx`, DB schema.
+
 ## Poznámky k závislostem
 - S14 staví na S5 (progres). S13 staví na S12 (snowball/podcviky). S16 a S17 jsou největší a vyžadují infra rozhodnutí (PWA web push vs. nativní Capacitor).
 - Pořadí S1–S8 je doporučené (rychlé, vysoký dopad, bez DB), ale sessiony jsou víceméně nezávislé — pořadí lze měnit.
+- Backlog S33+ (audit 2026-08-30): P1 bugy dřív než P2/P3. S33 (notifikace) a S37 (snowball) jsou největší v P1; S43 (týdenní frekvence) je největší celkově.
