@@ -601,7 +601,10 @@ export function HabitForm({
           if (!open) onClose?.();
         }}
       >
-        <DialogContent className="max-h-[90vh] overflow-y-auto">
+        <DialogContent
+          className="max-h-[90vh] overflow-y-auto"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle>{habit ? "Edit Habit" : "Create New Habit"}</DialogTitle>
             <DialogDescription>

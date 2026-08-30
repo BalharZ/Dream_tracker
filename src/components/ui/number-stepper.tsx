@@ -69,7 +69,7 @@ export function NumberStepper({
         value={value === null || value === undefined ? "" : String(value)}
         placeholder={placeholder}
         disabled={disabled}
-        className={cn("text-center", inputClassName)}
+        className={cn("min-w-0 flex-1 text-center", inputClassName)}
         onChange={(e) => {
           const raw = e.target.value;
           if (raw === "") {

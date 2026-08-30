@@ -340,6 +340,21 @@
 
 ---
 
+### S34 — Habits mobil: overflow doleva + klávesnice/plus jumping (#7, #16)
+**Soubory:** `src/pages/habits-page.tsx`, `src/components/habits/habit-form.tsx`, `src/components/ui/number-stepper.tsx`
+**Zadání:** (#7) zvyk na mobilu utekl doleva za obrazovku; (#16) u group zvyku (zvyk s podcviky) se defaultně vytáhla klávesnice a „plus" tlačítko utíkalo pod rukou.
+**Příčiny:**
+- #7: v History tabulce byl levý sloupec „Habit + Target" jen `flex-shrink-0` v horizontálně scrollovaném gridu — při scrollu dat se odscrolloval doleva mimo obrazovku a nebylo vidět, o který zvyk jde.
+- #16: `EditProgressDialog` (a částečně i habit-form dialog) při otevření automaticky zafokusoval první pole. U group zvyku je první tabbable prvek input v `NumberStepper` → na mobilu vyskočila klávesnice, layout se přeskládal (viewport se zmenšil) a +/− tlačítka se posunula pod prstem.
+
+✅ **Hotovo (2026-08-30)**:
+1. **Zmrazený levý sloupec (#7):** blok „Habit + Target" v `habits-page.tsx` dostal `sticky left-0 z-10 bg-card` → při horizontálním scrollu dat zůstává název zvyku + target přišpendlený vlevo a neuteče z obrazovky. Opaque `bg-card` pod ním brání prosvítání scrollujících buněk (barevný tint řádku `${color}10` se skládá přes opaque pozadí, takže vizuál zůstává). Desktop beze změny (scroll většinou není potřeba).
+2. **Bez auto-fokusu / klávesnice (#16):** `EditProgressDialog` i habit-form `DialogContent` mají `onOpenAutoFocus={(e) => e.preventDefault()}` → na mobilu se při otevření nevytáhne klávesnice; uživatel klepne do pole, až když chce. Odstraněn i explicitní `autoFocus` z číselného inputu v `EditProgressDialog`.
+3. **Stabilní stepper (#16):** input v `NumberStepper` dostal `min-w-0 flex-1` → vždy vyplní zbylé místo mezi −/+ a nikdy netlačí tlačítka při růstu čísla (1 → 100). Kombinace s bodem 2 = „plus" už neskáče pod prstem.
+**Ověřeno:** `tsc --noEmit` bez chyb; `vite build` prošel (✓ built). Vizuální doověření na mobilu (sticky sloupec při scrollu, žádná vyskakující klávesnice, stabilní +/−) je za přihlášením + Supabase daty — k ručnímu doověření majitelem na telefonu.
+
+---
+
 ## Backlog — audit seznamu úprav (2026-08-30)
 
 > Audit seznamu 19 úprav od majitele proti aktuálnímu kódu. Legenda: ✅ hotovo · ⚠️ bug/regrese (kód existuje, ale nefunguje jak má) · ❌ nezačato (nová funkce). Body rozkouskované do samostatných budoucích sessionů (S33+) tak, aby každá byla nezávislá a šetřila tokeny — po resetu stačí říct číslo/název sessionu.
@@ -353,7 +368,7 @@
 | 4 | Odstranit tab/podstránku Calendar | ✅ hotovo (commit a1cb3a1) | — |
 | 5 | Add reward: „browse" sloučit dovnitř jednoho „Add reward" | ❌ (2 tlačítka) | S38 |
 | 6 | Notifikace nestřílí v čase (appka i chrome); skáčou při připojení telefonu; duplicitní | ✅ hotovo (S33, 2026-08-30) | S33 |
-| 7 | Zvyk na mobilu utekl doleva za obrazovku | ⚠️ (layout overflow) | S34 |
+| 7 | Zvyk na mobilu utekl doleva za obrazovku | ✅ hotovo (S34, 2026-08-30) | S34 |
 | 8 | Moc notifikací (chrome + appka) — vypnout web push, jen appka | ✅ hotovo (S33, 2026-08-30) | S33 |
 | 9 | Snowball: jak funguje + má i klesat, když se nevyplní | ❌ (růst je, decay není) | S37 |
 | 10 | Do tvorby odměn dostat obrázky (free databanka / google) | ❌ = duplicitní s #1 | S41 |
@@ -362,7 +377,7 @@
 | 13 | Sjednotit zobrazení obrázků (rewards+dreams): full šířka, výška auto | ❌ | S39 |
 | 14 | Widget refresh tlačítko nefunguje | ⚠️ (ACTION_REFRESH je zadrátován, ladit) | S42 |
 | 15 | Shluky podcílů v habits zmizely (regrese) | ⚠️ | S35 |
-| 16 | Group zvyk: default vytažená klávesnice + plusko utíká pod rukou | ⚠️ | S34 |
+| 16 | Group zvyk: default vytažená klávesnice + plusko utíká pod rukou | ✅ hotovo (S34, 2026-08-30) | S34 |
 | 17 | Týdenní zvyk: Nx/týden, odměna po každém, na konci týdne speciální losování (diamant 10 %, volba odměny) | ❌ (jen daily/weekly select) | S43 |
 | 18 | Nefunguje propsání/uložení zvyků z dashboardu | ⚠️ (`today-habits.tsx` mutace existuje, ladit) | S36 |
 | 19 | Snowball: nespustí se výherní animace + target svítí 0 | ⚠️ | S37 |
@@ -371,7 +386,7 @@
 
 **P1 — bugy a bolest**
 - [x] **S33 — Notifikace: jen z appky, vypnout web push, opravit timing/duplikáty** (#6, #8) ✅ 2026-08-30 (viz sekce S33 níže).
-- [ ] **S34 — Habits mobil: overflow doleva + klávesnice/plus jumping** (#7, #16). Layout zvyku na mobilu neutíká za okraj; u group zvyku nevytahovat klávesnici defaultně (autofocus pryč), plus tlačítko nesmí skákat. Soubory: `src/pages/habits-page.tsx`, `src/components/habits/*`, `number-stepper.tsx`.
+- [x] **S34 — Habits mobil: overflow doleva + klávesnice/plus jumping** (#7, #16) ✅ 2026-08-30 (viz sekce S34 níže).
 - [ ] **S35 — Podcíle/shluky: regrese + součet hlavního čísla** (#2, #15). Shluky podcílů se přestaly zobrazovat — najít regresi; a místo „1 z podcílů" ukázat sečtené hlavní číslo (5 kliků = 5). Soubory: `src/lib/habit-clusters.ts`, `src/pages/habits-page.tsx`, `today-habits.tsx`.
 - [ ] **S36 — Dashboard: propsání/uložení zvyků** (#18). `src/components/habits/today-habits.tsx` — `updateProgress` mutace existuje, ale zápis se neprojeví; ladit save-timer/invalidate/kaskádu progresu.
 - [ ] **S37 — Snowball: decay + oprava animace/target 0 + dokumentace** (#9, #19). Přidat pokles targetu, když se zvyk nevyplní; opravit, proč se nespustí výherní animace a proč target v tabulce = 0. Doplnit stručný popis jak snowball funguje. Soubory: `src/lib/snowball.ts`, ruleta/animace v `reward-roulette.tsx`.

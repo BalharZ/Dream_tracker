@@ -242,8 +242,11 @@ function HabitsPage() {
           <div className="relative">
             {/* Horizontally scrollable grid */}
             <div className="flex overflow-x-auto">
-              {/* Habit + Target columns */}
-              <div className="flex-shrink-0 border-r">
+              {/* Habit + Target columns — frozen to the left so the habit name
+                  stays visible while the date grid scrolls (owner report #7:
+                  the habit used to run off the left edge on mobile). Opaque
+                  bg-card so scrolling date cells don't show through. */}
+              <div className="flex-shrink-0 border-r sticky left-0 z-10 bg-card">
                 {/* Header row */}
                 <div className="flex border-b">
                   <div className="w-44 sm:w-56 px-2 sm:px-3 py-3 text-sm font-medium text-muted-foreground">Habit</div>
@@ -554,7 +557,10 @@ function EditProgressDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent>
+      {/* Don't auto-focus a field on open: on mobile that pops the keyboard up
+          by default and the reflow makes the +/- steppers jump under the
+          finger (owner report #7/#16). The user taps a field when ready. */}
+      <DialogContent onOpenAutoFocus={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle>Update {habit.name}</DialogTitle>
         </DialogHeader>
@@ -615,7 +621,6 @@ function EditProgressDialog({
             <div className="flex items-center space-x-2">
               <Input
                 type="number"
-                autoFocus
                 min={0}
                 placeholder="0"
                 value={value}
