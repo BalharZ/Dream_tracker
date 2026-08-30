@@ -54,6 +54,23 @@ export function countDoneUnits(
 }
 
 /**
+ * The habit's day value as the *summed real quantity* done (owner request #2:
+ * "5 push-ups = 5", not "1 of subgoals"). A standalone AND sub-exercise
+ * contributes its own value; an OR cluster contributes only its best member
+ * (you only need to do one), so filling one member of "5 push-ups OR 5 squats"
+ * counts as 5, and it never double-counts if both happen to be filled.
+ */
+export function sumUnitValues(
+  units: ClusterUnit[],
+  valueOf: (subitemId: number) => number
+): number {
+  return units.reduce((acc, u) => {
+    if (u.kind === "single") return acc + valueOf(u.subitem.id);
+    return acc + u.members.reduce((max, m) => Math.max(max, valueOf(m.id)), 0);
+  }, 0);
+}
+
+/**
  * Escalation: after escalation_days days since last_escalation_at (falling
  * back to created_at) the app offers to escalate — add a sub-exercise or
  * tighten an OR cluster. Checked lazily, no cron needed.

@@ -8,7 +8,14 @@ import { Habit, HabitSubitem, Goal, Reward } from "@shared/schema";
 import { supabase } from "@/lib/supabase";
 import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
-import { ChevronRight, Flame, Medal, StickyNote, TrendingUp } from "lucide-react";
+import { Check, ChevronRight, Flame, Medal, StickyNote, TrendingUp } from "lucide-react";
+import {
+  buildUnits,
+  isUnitDone,
+  sumUnitValues,
+  escalationDue,
+  snoozeEscalation,
+} from "@/lib/habit-clusters";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { HabitForm } from "@/components/habits/habit-form";
@@ -166,9 +173,9 @@ function HabitsPage() {
 
     updateProgress.mutate({ habitId, value, date });
 
-    // For sub-exercise habits the day's value is the number of completed units,
-    // so the dialog passes the unit count as the win threshold instead of the
-    // stored target_value (which no longer maps to the value).
+    // The dialog passes the habit's target as the win threshold; for
+    // sub-exercise habits the value is the summed quantity across units (owner
+    // #2), which is measured against the same target_value.
     const threshold = target ?? habit.target_value;
 
     const timeout = setTimeout(() => {
@@ -533,7 +540,29 @@ function EditProgressDialog({
     const v = subValues[id];
     return typeof v === "string" ? Number(v) || 0 : v || 0;
   };
-  const subitemTotal = (subitems || []).reduce((acc, s) => acc + subNumeric(s.id), 0);
+  // Group sub-exercises into units: standalone (AND) rows + OR clusters
+  // (complete any one). The habit's day value is the *summed real quantity*
+  // done across units (owner #2: "5 = 5", not the count of finished units),
+  // where an OR cluster counts only its best member.
+  const units = buildUnits(subitems || []);
+  const subitemTotal = sumUnitValues(units, subNumeric);
+
+  // Escalation offer (S13). Hidden locally after snoozing — the habit prop is
+  // stale until the habits query refetches.
+  const [escalationSnoozed, setEscalationSnoozed] = useState(false);
+  useEffect(() => {
+    setEscalationSnoozed(false);
+  }, [habit.id, isOpen]);
+  const showEscalation = escalationDue(habit) && !escalationSnoozed;
+  const handleSnoozeEscalation = async () => {
+    setEscalationSnoozed(true);
+    try {
+      await snoozeEscalation(habit.id);
+      queryClient.invalidateQueries({ queryKey: ["habits"] });
+    } catch (error) {
+      console.error("Error snoozing escalation:", error);
+    }
+  };
 
   const handleSave = async () => {
     if (hasSubitems) {
@@ -548,7 +577,7 @@ function EditProgressDialog({
         .upsert(rows, { onConflict: "subitem_id,user_id,date" });
       if (error) console.error("Error saving sub-exercise progress:", error);
       queryClient.invalidateQueries({ queryKey: ["habit_subitem_progress"] });
-      // The habit's day value is the sum of all sub-exercises.
+      // The habit's day value is the summed quantity across units.
       onSave(subitemTotal, habit.target_value);
     } else {
       onSave(typeof value === "string" ? 0 : value, habit.target_value);
@@ -587,32 +616,91 @@ function EditProgressDialog({
             </p>
           )}
 
+          {showEscalation && (
+            <div className="rounded-md border border-amber-400 bg-amber-50 dark:bg-amber-950/30 p-2 space-y-2">
+              <p className="text-sm">
+                Time to escalate <span className="font-medium">{habit.name}</span> —
+                consider adding a sub-exercise or tightening an OR group.
+              </p>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" size="sm" onClick={handleSnoozeEscalation}>
+                  Later
+                </Button>
+                {onEditHabit && (
+                  <Button size="sm" onClick={onEditHabit}>
+                    Escalate (edit habit)
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+
           {hasSubitems ? (
             <div className="space-y-2">
-              {subitems!.map((s) => (
-                <div
-                  key={s.id}
-                  className="flex items-center gap-2 rounded-md border p-2"
-                >
-                  <div className="min-w-0 flex-1 truncate text-sm font-medium">
-                    {s.name}
+              {units.map((unit) => {
+                const renderRow = (s: HabitSubitem) => {
+                  const done = subNumeric(s.id) >= (s.target || 1);
+                  return (
+                    <div
+                      key={s.id}
+                      className="flex items-center gap-2 rounded-md border p-2"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-medium">{s.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          Target: {s.target} {s.unit || habit.unit}
+                        </div>
+                      </div>
+                      {(s.target || 1) > 1 && (
+                        <NumberStepper
+                          min={0}
+                          value={subValues[s.id] ?? 0}
+                          onChange={(v) =>
+                            setSubValues((prev) => ({ ...prev, [s.id]: v }))
+                          }
+                          className="w-32 shrink-0"
+                          inputClassName="h-9"
+                          buttonClassName="h-9 w-9"
+                          aria-label={`${s.name} value`}
+                        />
+                      )}
+                      <Button
+                        size="icon"
+                        variant={done ? "default" : "outline"}
+                        className="shrink-0"
+                        style={done ? { backgroundColor: habit.color } : undefined}
+                        onClick={() =>
+                          setSubValues((prev) => ({
+                            ...prev,
+                            [s.id]: done ? 0 : s.target || 1,
+                          }))
+                        }
+                        aria-label={`Toggle ${s.name} done`}
+                        title={done ? "Mark as not done" : "Mark as done"}
+                      >
+                        <Check className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  );
+                };
+
+                if (unit.kind === "single") return renderRow(unit.subitem);
+
+                const orDone = isUnitDone(unit, subNumeric);
+                return (
+                  <div
+                    key={`or-${unit.group}`}
+                    className={`space-y-2 rounded-md border border-dashed p-2 ${
+                      orDone ? "border-green-500" : ""
+                    }`}
+                  >
+                    <p className="text-xs font-medium text-muted-foreground">
+                      OR group — complete any one{orDone ? " ✓" : ""}
+                    </p>
+                    {unit.members.map(renderRow)}
                   </div>
-                  <NumberStepper
-                    min={0}
-                    value={subValues[s.id] ?? 0}
-                    onChange={(v) =>
-                      setSubValues((prev) => ({ ...prev, [s.id]: v }))
-                    }
-                    className="w-32 shrink-0"
-                    inputClassName="h-9"
-                    buttonClassName="h-9 w-9"
-                    aria-label={`${s.name} value`}
-                  />
-                  <span className="text-xs text-muted-foreground w-10 shrink-0 truncate">
-                    {habit.unit}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
               <p className="text-sm font-medium">
                 Total: {subitemTotal} / {habit.target_value} {habit.unit}
               </p>

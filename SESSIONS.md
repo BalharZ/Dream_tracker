@@ -355,6 +355,19 @@
 
 ---
 
+### S35 — Podcíle/shluky: regrese zobrazení + součet hlavního čísla (#2, #15)
+**Soubory:** `src/lib/habit-clusters.ts`, `src/pages/habits-page.tsx`
+**Zadání:** (#15) OR/AND shluky podcviků se v dialogu dne přestaly zobrazovat (regrese); (#2) místo „1 z podcílů" (počet splněných jednotek) ukázat sečtené hlavní číslo (5 kliků = 5).
+**Příčina regrese:** commity S22/S23 (`47856d2`/`051a7fa`) přepsaly `EditProgressDialog` na plochý seznam podcviků + prostý součet a přitom vyhodily seskupení do OR shluků (dashed box „complete any one") i banner eskalace, které přidal S13/S21. Zároveň S13 verze zapisovala jako denní hodnotu **počet splněných jednotek** (`doneCount`) — přesně to „1 z podcílů", co majitel v #2 nechce.
+
+✅ **Hotovo (2026-08-30)** — **BEZ SQL** (jen výpočet + UI):
+1. **`habit-clusters.ts`:** nový helper `sumUnitValues(units, valueOf)` — denní hodnota zvyku = **sečtená reálná hodnota** napříč jednotkami: samostatný (AND) podcvik přispívá svou hodnotou, OR shluk přispívá jen svým **nejlepším** členem (stačí splnit jeden → 5 kliků NEBO 5 dřepů = 5, bez dvojího počítání). Tím se řeší #2.
+2. **`habits-page.tsx` (`EditProgressDialog`):** obnoveno seskupení podcviků do jednotek přes `buildUnits` — AND řádky samostatně, **OR shluk** v čárkovaném rámečku „OR group — complete any one" (zezelená po splnění libovolného člena); u targetu 1 jen fajfka (toggle 0/target), u vyššího stepper + fajfka. Vráceno i **eskalační** upozornění (`escalationDue`/`snoozeEscalation` + tlačítka Later / Escalate). Denní hodnota zvyku = `sumUnitValues` (součet), target = `habit.target_value`, spodní řádek „Total: X / target unit". `onSave(subitemTotal, habit.target_value)` — ruleta se spouští při součet ≥ target (threshold komentář aktualizován).
+3. Import `Check` (lucide) + `buildUnits/isUnitDone/sumUnitValues/escalationDue/snoozeEscalation` do habits-page. `today-habits.tsx` beze změny — rychlé plnění na dashboardu (#18) je samostatný S36.
+**Ověřeno:** `tsc --noEmit` bez chyb; `vite build` prošel (✓ built 15 s); dev server renderuje login čistě, konzole bez chyb (cluster UI je za přihlášením + Supabase daty). **K doověření majitelem:** zvyk s podcviky 1×AND + 2×„OR 1" → v dialogu dne se zobrazí OR rámeček; splnění → „Total" ukazuje sečtené číslo (5), ne 1; při dosažení targetu se spustí ruleta.
+
+---
+
 ## Backlog — audit seznamu úprav (2026-08-30)
 
 > Audit seznamu 19 úprav od majitele proti aktuálnímu kódu. Legenda: ✅ hotovo · ⚠️ bug/regrese (kód existuje, ale nefunguje jak má) · ❌ nezačato (nová funkce). Body rozkouskované do samostatných budoucích sessionů (S33+) tak, aby každá byla nezávislá a šetřila tokeny — po resetu stačí říct číslo/název sessionu.
@@ -363,7 +376,7 @@
 | # | Bod | Stav | Session |
 |---|-----|------|---------|
 | 1 | Sosat free databázi obrázků přes API | ❌ nezačato | S41 |
-| 2 | Skupina zvyků: zobrazit sečtené hlavní číslo (5), ne „1 z podcílů" | ⚠️ | S35 |
+| 2 | Skupina zvyků: zobrazit sečtené hlavní číslo (5), ne „1 z podcílů" | ✅ hotovo (S35, 2026-08-30) | S35 |
 | 3 | Odměny řadit dle množství (víc = výš) — „už bylo, nefunguje" | ⚠️ (řadí se dle `available`+`created_at`, ne dle množství) | S38 |
 | 4 | Odstranit tab/podstránku Calendar | ✅ hotovo (commit a1cb3a1) | — |
 | 5 | Add reward: „browse" sloučit dovnitř jednoho „Add reward" | ❌ (2 tlačítka) | S38 |
@@ -376,7 +389,7 @@
 | 12 | Odebrat ikonu aktualizace („update" šipky) z hlavičky (je i v Nastavení) | ✅ hotovo (2026-08-30, commit) | — |
 | 13 | Sjednotit zobrazení obrázků (rewards+dreams): full šířka, výška auto | ❌ | S39 |
 | 14 | Widget refresh tlačítko nefunguje | ⚠️ (ACTION_REFRESH je zadrátován, ladit) | S42 |
-| 15 | Shluky podcílů v habits zmizely (regrese) | ⚠️ | S35 |
+| 15 | Shluky podcílů v habits zmizely (regrese) | ✅ hotovo (S35, 2026-08-30) | S35 |
 | 16 | Group zvyk: default vytažená klávesnice + plusko utíká pod rukou | ✅ hotovo (S34, 2026-08-30) | S34 |
 | 17 | Týdenní zvyk: Nx/týden, odměna po každém, na konci týdne speciální losování (diamant 10 %, volba odměny) | ❌ (jen daily/weekly select) | S43 |
 | 18 | Nefunguje propsání/uložení zvyků z dashboardu | ⚠️ (`today-habits.tsx` mutace existuje, ladit) | S36 |
@@ -387,7 +400,7 @@
 **P1 — bugy a bolest**
 - [x] **S33 — Notifikace: jen z appky, vypnout web push, opravit timing/duplikáty** (#6, #8) ✅ 2026-08-30 (viz sekce S33 níže).
 - [x] **S34 — Habits mobil: overflow doleva + klávesnice/plus jumping** (#7, #16) ✅ 2026-08-30 (viz sekce S34 níže).
-- [ ] **S35 — Podcíle/shluky: regrese + součet hlavního čísla** (#2, #15). Shluky podcílů se přestaly zobrazovat — najít regresi; a místo „1 z podcílů" ukázat sečtené hlavní číslo (5 kliků = 5). Soubory: `src/lib/habit-clusters.ts`, `src/pages/habits-page.tsx`, `today-habits.tsx`.
+- [x] **S35 — Podcíle/shluky: regrese + součet hlavního čísla** (#2, #15) ✅ 2026-08-30 (viz sekce S35 níže).
 - [ ] **S36 — Dashboard: propsání/uložení zvyků** (#18). `src/components/habits/today-habits.tsx` — `updateProgress` mutace existuje, ale zápis se neprojeví; ladit save-timer/invalidate/kaskádu progresu.
 - [ ] **S37 — Snowball: decay + oprava animace/target 0 + dokumentace** (#9, #19). Přidat pokles targetu, když se zvyk nevyplní; opravit, proč se nespustí výherní animace a proč target v tabulce = 0. Doplnit stručný popis jak snowball funguje. Soubory: `src/lib/snowball.ts`, ruleta/animace v `reward-roulette.tsx`.
 
