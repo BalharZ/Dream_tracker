@@ -325,6 +325,21 @@
 
 ---
 
+### S33 — Notifikace: jen z nativní appky, vypnutí web pushe (#6, #8)
+**Soubory:** `src/lib/push.ts`, `src/main.tsx`, `public/sw.js`, `src/components/habits/habit-form.tsx`, `supabase/sql/S33_disable_web_push.sql`
+**Zadání:** notifikace chodily duplicitně (chrome web push + nativní appka) a chrome je doručoval opožděně/dávkově (např. až po připojení telefonu). Web push (S16) vypnout, nechat jen nativní lokální notifikace z appky (S20).
+**Příčina duplikátů:** ke každé připomínce mohly dorazit **dvě** notifikace — jedna z Edge Function přes web push do prohlížeče, druhá z nativní appky. Prohlížeč (Chrome desktop) navíc doručoval frontu web pushů dávkově až při probuzení/reconnectu → efekt „skáčou při připojení telefonu".
+
+✅ **Hotovo (2026-08-30)**:
+1. **`src/lib/push.ts` přepsán z „subscribe" na „teardown":** nový `disableWebPush()` — v prohlížeči odhlásí případnou aktivní `PushSubscription`, smaže její řádek z `push_subscriptions` (aby ji Edge Function přestala cílit) a **odregistruje service worker**. Odstraněny `ensurePushSubscription`, `registerServiceWorker`, VAPID klíč. `isPushSupported` ponecháno.
+2. **`src/main.tsx`:** místo `registerServiceWorker()` se při startu volá `disableWebPush()` (úklid zbytkového pushe). V nativní appce no-op.
+3. **`public/sw.js`:** nahrazen sebe-odregistrujícím stubem — na `activate` odhlásí subscription a zavolá `registration.unregister()`; `push` event ignoruje. Prohlížeče `sw.js` při navigaci byte-porovnávají, takže i zařízení se starým SW ho při další návštěvě zahodí (a stará handler už nic nezobrazí).
+4. **`habit-form.tsx`:** v prohlížeči už toggle „Reminder" nesubscribuje web push — jen toast „Reminders work in the app" (nastavení se uloží a projeví se na telefonu). Nativní větev (OS permission + exact alarm + `scheduleHabitReminder` na save) beze změny → duplikát „chrome + appka" zmizel.
+5. **Server-side kill (`supabase/sql/S33_disable_web_push.sql`):** `cron.unschedule('send-habit-notifications')`, aby se Edge Function přestala každých 5 min spouštět. **Stav DB ověřen přes MCP:** `push_subscriptions` má **0 řádků** (žádný prohlížeč už není subscribovaný), cron job `send-habit-notifications` byl ještě `active` — přímý zápis (unschedule) přes MCP zablokoval bezpečnostní klasifikátor u produkční DB, takže SQL je připraven jako **ruční krok majitele** (spustit v Supabase SQL editoru). Bez cronu Edge Function nic neposílá; navíc nemá komu (0 subscriptions).
+**Ověřeno:** `tsc --noEmit` bez chyb; `vite build` prošel (✓ built). Žádné zbylé reference na `ensurePushSubscription`/`registerServiceWorker`/`VITE_VAPID_PUBLIC_KEY` v `src/`. **Ruční krok majitele:** (1) spustit `S33_disable_web_push.sql` v Supabase SQL editoru (odplánuje cron); (2) po deployi na Vercel jednou otevřít web v každém prohlížeči, kde dřív chodily notifikace — tím se SW odregistruje a subscription smaže. Nativní připomínky z appky fungují dál beze změny.
+
+---
+
 ## Backlog — audit seznamu úprav (2026-08-30)
 
 > Audit seznamu 19 úprav od majitele proti aktuálnímu kódu. Legenda: ✅ hotovo · ⚠️ bug/regrese (kód existuje, ale nefunguje jak má) · ❌ nezačato (nová funkce). Body rozkouskované do samostatných budoucích sessionů (S33+) tak, aby každá byla nezávislá a šetřila tokeny — po resetu stačí říct číslo/název sessionu.
@@ -337,9 +352,9 @@
 | 3 | Odměny řadit dle množství (víc = výš) — „už bylo, nefunguje" | ⚠️ (řadí se dle `available`+`created_at`, ne dle množství) | S38 |
 | 4 | Odstranit tab/podstránku Calendar | ✅ hotovo (commit a1cb3a1) | — |
 | 5 | Add reward: „browse" sloučit dovnitř jednoho „Add reward" | ❌ (2 tlačítka) | S38 |
-| 6 | Notifikace nestřílí v čase (appka i chrome); skáčou při připojení telefonu; duplicitní | ⚠️ | S33 |
+| 6 | Notifikace nestřílí v čase (appka i chrome); skáčou při připojení telefonu; duplicitní | ✅ hotovo (S33, 2026-08-30) | S33 |
 | 7 | Zvyk na mobilu utekl doleva za obrazovku | ⚠️ (layout overflow) | S34 |
-| 8 | Moc notifikací (chrome + appka) — vypnout web push, jen appka | ⚠️ | S33 |
+| 8 | Moc notifikací (chrome + appka) — vypnout web push, jen appka | ✅ hotovo (S33, 2026-08-30) | S33 |
 | 9 | Snowball: jak funguje + má i klesat, když se nevyplní | ❌ (růst je, decay není) | S37 |
 | 10 | Do tvorby odměn dostat obrázky (free databanka / google) | ❌ = duplicitní s #1 | S41 |
 | 11 | Odebrat poznámky (Notes) u nastavení zvyků | ❌ (pole `notes` stále v `habit-form.tsx`) | S40 |
@@ -355,7 +370,7 @@
 ### Rozkouskovaný plán (priorita: nejdřív bugy/bolest, pak funkce)
 
 **P1 — bugy a bolest**
-- [ ] **S33 — Notifikace: jen z appky, vypnout web push, opravit timing/duplikáty** (#6, #8). Web push (`src/lib/push.ts`, `sw.js`, Edge Function) vypnout / odhlásit v prohlížeči; nechat jen nativní lokální notifikace (`src/lib/local-notifications.ts` + `android/.../reminders/`). Prověřit dvojité notifikace při přenastavení času a proč chrome střílí až při připojení telefonu.
+- [x] **S33 — Notifikace: jen z appky, vypnout web push, opravit timing/duplikáty** (#6, #8) ✅ 2026-08-30 (viz sekce S33 níže).
 - [ ] **S34 — Habits mobil: overflow doleva + klávesnice/plus jumping** (#7, #16). Layout zvyku na mobilu neutíká za okraj; u group zvyku nevytahovat klávesnici defaultně (autofocus pryč), plus tlačítko nesmí skákat. Soubory: `src/pages/habits-page.tsx`, `src/components/habits/*`, `number-stepper.tsx`.
 - [ ] **S35 — Podcíle/shluky: regrese + součet hlavního čísla** (#2, #15). Shluky podcílů se přestaly zobrazovat — najít regresi; a místo „1 z podcílů" ukázat sečtené hlavní číslo (5 kliků = 5). Soubory: `src/lib/habit-clusters.ts`, `src/pages/habits-page.tsx`, `today-habits.tsx`.
 - [ ] **S36 — Dashboard: propsání/uložení zvyků** (#18). `src/components/habits/today-habits.tsx` — `updateProgress` mutace existuje, ale zápis se neprojeví; ladit save-timer/invalidate/kaskádu progresu.

@@ -1,12 +1,14 @@
 import { supabase } from "@/lib/supabase";
 
-// Web push (S16): registers the service worker, asks for notification
-// permission and stores the browser's PushSubscription in Supabase so the
-// `send-habit-notifications` Edge Function can reach this device.
-
-const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY as
-  | string
-  | undefined;
+// S33: web push is retired. Reminders now come only from the native Android app
+// (on-device local notifications, src/lib/local-notifications.ts). Web push
+// caused duplicate/late notifications in the browser (Chrome delivered queued
+// pushes in batches, e.g. only when the phone reconnected) on top of the app's
+// own notification.
+//
+// This module used to register a service worker and subscribe the browser to
+// web push. It now does the opposite: it tears the subscription down so no
+// browser keeps receiving pushes from the (now unscheduled) Edge Function.
 
 export function isPushSupported(): boolean {
   return (
@@ -17,68 +19,34 @@ export function isPushSupported(): boolean {
   );
 }
 
-// PushManager.subscribe wants the raw key bytes, not the base64url string.
-function urlBase64ToUint8Array(base64: string): Uint8Array {
-  const padding = "=".repeat((4 - (base64.length % 4)) % 4);
-  const normalized = (base64 + padding).replace(/-/g, "+").replace(/_/g, "/");
-  const raw = window.atob(normalized);
-  const output = new Uint8Array(raw.length);
-  for (let i = 0; i < raw.length; i++) output[i] = raw.charCodeAt(i);
-  return output;
-}
-
-// Register the SW early (app start) so the device can receive pushes even
-// before the user touches a habit form in this session. Safe to call always.
-export function registerServiceWorker() {
+/**
+ * Disable web push on this browser: unsubscribe any active PushSubscription,
+ * delete its row from Supabase so the Edge Function stops targeting it, and
+ * unregister the service worker. Called on app start; safe to run every time
+ * (a no-op once there's nothing left to clean up). No-op outside the browser.
+ */
+export async function disableWebPush(): Promise<void> {
   if (!("serviceWorker" in navigator)) return;
-  navigator.serviceWorker.register("/sw.js").catch((err) => {
-    console.error("Service worker registration failed:", err);
-  });
-}
-
-export type PushSubscribeResult =
-  | "subscribed"
-  | "denied"
-  | "unsupported"
-  | "error";
-
-// Ensure this browser has an active push subscription stored in Supabase.
-// Must be called from a user gesture (click) so the permission prompt shows.
-export async function ensurePushSubscription(
-  userId: string
-): Promise<PushSubscribeResult> {
-  if (!isPushSupported() || !VAPID_PUBLIC_KEY) return "unsupported";
-
   try {
-    await navigator.serviceWorker.register("/sw.js");
-    const registration = await navigator.serviceWorker.ready;
-
-    const permission = await Notification.requestPermission();
-    if (permission !== "granted") return "denied";
-
-    let subscription = await registration.pushManager.getSubscription();
-    if (!subscription) {
-      subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-      });
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    for (const registration of registrations) {
+      try {
+        const subscription = await registration.pushManager?.getSubscription();
+        if (subscription) {
+          // Remove the server-side target first so no more pushes are sent here.
+          await supabase
+            .from("push_subscriptions")
+            .delete()
+            .eq("endpoint", subscription.endpoint);
+          await subscription.unsubscribe();
+        }
+      } catch (err) {
+        console.error("Unsubscribing web push failed:", err);
+      }
+      // Drop the service worker itself so the old push handler can't fire again.
+      await registration.unregister().catch(() => {});
     }
-
-    const json = subscription.toJSON();
-    const { error } = await supabase.from("push_subscriptions").upsert(
-      {
-        user_id: userId,
-        endpoint: subscription.endpoint,
-        p256dh: json.keys?.p256dh ?? "",
-        auth: json.keys?.auth ?? "",
-      },
-      { onConflict: "endpoint" }
-    );
-    if (error) throw error;
-
-    return "subscribed";
   } catch (err) {
-    console.error("Push subscription failed:", err);
-    return "error";
+    console.error("Disabling web push failed:", err);
   }
 }

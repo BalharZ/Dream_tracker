@@ -1,53 +1,30 @@
-// Dream Tracker service worker — web push (S16).
-// Receives push payloads sent by the Supabase Edge Function
-// `send-habit-notifications` and shows a notification with the dream's
-// image and the positive/negative motivation.
+// Dream Tracker service worker — RETIRED (S33).
+//
+// Web push was removed: reminders now come only from the native Android app.
+// This stub replaces the old push worker. Browsers re-fetch /sw.js on navigation
+// and byte-compare it, so shipping this self-unregistering version makes any
+// device that still has the old worker drop it on the next visit. It also
+// ignores push events, so even a stale controlling worker shows nothing.
 
 self.addEventListener("install", () => {
   self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
-});
-
-self.addEventListener("push", (event) => {
-  let data = {};
-  try {
-    data = event.data ? event.data.json() : {};
-  } catch {
-    data = { body: event.data ? event.data.text() : "" };
-  }
-
-  const title = data.title || "Dream Tracker";
-  const options = {
-    body: data.body || "",
-    icon: data.icon || "/icons/icon-512.png",
-    badge: data.badge || "/icons/icon-512.png",
-    // Big picture (the dream's image) — supported on Android/Chrome.
-    image: data.image || undefined,
-    tag: data.tag || undefined,
-    data: { url: data.url || "/" },
-  };
-
-  event.waitUntil(self.registration.showNotification(title, options));
-});
-
-self.addEventListener("notificationclick", (event) => {
-  event.notification.close();
-  const url = (event.notification.data && event.notification.data.url) || "/";
-
   event.waitUntil(
-    self.clients
-      .matchAll({ type: "window", includeUncontrolled: true })
-      .then((clientList) => {
-        for (const client of clientList) {
-          if ("focus" in client) {
-            client.navigate(url);
-            return client.focus();
-          }
-        }
-        return self.clients.openWindow(url);
-      })
+    (async () => {
+      // Remove any leftover web-push subscription, then unregister self.
+      try {
+        const subscription = await self.registration.pushManager.getSubscription();
+        if (subscription) await subscription.unsubscribe();
+      } catch (err) {
+        // ignore
+      }
+      await self.registration.unregister();
+      await self.clients.claim();
+    })()
   );
 });
+
+// Swallow any push that still arrives before the worker is gone.
+self.addEventListener("push", () => {});

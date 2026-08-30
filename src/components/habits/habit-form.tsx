@@ -39,7 +39,6 @@ import { conversionFactor, isTimeUnit, sameTimeUnit, timeAltUnit } from "@/lib/u
 import { getChance, getQuantity, makeChanceEntry, parseHabitChances } from "@/lib/habit-chances";
 import { increaseSnowballNow } from "@/lib/snowball";
 import { escalationDue, snoozeEscalation } from "@/lib/habit-clusters";
-import { ensurePushSubscription } from "@/lib/push";
 import {
   isNativeApp,
   ensureNotificationPermission,
@@ -984,30 +983,14 @@ export function HabitForm({
                         }
                         return;
                       }
-                      // Browser: subscribe this browser right away.
-                      const result = await ensurePushSubscription(user.id);
-                      if (result === "denied") {
-                        toast({
-                          title: "Notifications blocked",
-                          description:
-                            "Allow notifications for this site (or enable the reminder on the device where you want it).",
-                          variant: "destructive",
-                        });
-                      } else if (result === "unsupported") {
-                        toast({
-                          title: "Push not supported here",
-                          description:
-                            "This browser can't receive push notifications. On iPhone, install the app to the home screen first.",
-                          variant: "destructive",
-                        });
-                      } else if (result === "error") {
-                        toast({
-                          title: "Subscription failed",
-                          description:
-                            "Could not register this device for push. The reminder stays on — try again later.",
-                          variant: "destructive",
-                        });
-                      }
+                      // Browser: reminders are delivered only by the native
+                      // Android app now (S33 retired web push). Keep the setting
+                      // so it applies on the phone, but tell the user here.
+                      toast({
+                        title: "Reminders work in the app",
+                        description:
+                          "This reminder will fire on your phone in the Dream Tracker app. Browser notifications are no longer used.",
+                      });
                     }}
                   />
                 </div>
