@@ -343,7 +343,7 @@
 | 9 | Snowball: jak funguje + má i klesat, když se nevyplní | ❌ (růst je, decay není) | S37 |
 | 10 | Do tvorby odměn dostat obrázky (free databanka / google) | ❌ = duplicitní s #1 | S41 |
 | 11 | Odebrat poznámky (Notes) u nastavení zvyků | ❌ (pole `notes` stále v `habit-form.tsx`) | S40 |
-| 12 | Odebrat odkazy/„úpaty" z hlavičky (stačí v nastavení) | ❌ (nutno doupřesnit co přesně) | S40 |
+| 12 | Odebrat ikonu aktualizace („update" šipky) z hlavičky (je i v Nastavení) | ✅ hotovo (2026-08-30, commit) | — |
 | 13 | Sjednotit zobrazení obrázků (rewards+dreams): full šířka, výška auto | ❌ | S39 |
 | 14 | Widget refresh tlačítko nefunguje | ⚠️ (ACTION_REFRESH je zadrátován, ladit) | S42 |
 | 15 | Shluky podcílů v habits zmizely (regrese) | ⚠️ | S35 |
@@ -364,7 +364,7 @@
 **P2 — UI/UX a menší funkce**
 - [ ] **S38 — Rewards: řazení dle množství + sloučení Add/Browse do jednoho** (#3, #5). Řadit odměny dle počtu kusů (víc = výš); z „Add reward" udělat jediné tlačítko, kde je uvnitř volba „vytvořit vlastní" / „vybrat ze seznamu". Soubory: `src/pages/rewards-page.tsx`, `quick-rewards.tsx`.
 - [ ] **S39 — Obrázky: sjednotit zobrazení (full šířka, výška auto)** (#13). Rewards i dreams stejně: obrázek 100 % šířky, výška dle poměru. Soubory: `rewards-page.tsx`, `dreams-page.tsx`, `image-gallery.tsx`.
-- [ ] **S40 — Úklid: odebrat Notes u zvyku + odkazy z hlavičky** (#11, #12). Odstranit pole `notes` z `habit-form.tsx` (a schování v UI); vyčistit odkazy v hlavičce `main-layout.tsx` (nejdřív doupřesnit s majitelem, co přesně „úpaty").
+- [ ] **S40 — Úklid: odebrat Notes u zvyku** (#11). Odstranit pole `notes` z `habit-form.tsx` (a jeho zobrazení v UI). Pozn.: #12 (ikona aktualizace v hlavičce) už hotové 2026-08-30 — odebráno z `main-layout.tsx`, zůstává jen v Nastavení.
 - [ ] **S42 — Widget: oprava refresh tlačítka** (#14). Nativní `ACTION_REFRESH` je zadrátován (`HabitsWidgetProvider.java`), ale refresh nefunguje — ladit + rebuild APK.
 
 **P3 — větší funkce**

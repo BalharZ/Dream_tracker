@@ -9,7 +9,6 @@ import {
   Target,
   Repeat2,
   Gift,
-  RefreshCw,
   Download,
   Settings,
 } from "lucide-react";
@@ -106,18 +105,8 @@ export default function MainLayout({
               </a>
             </Button>
           )}
-          {/* Native app only: reload the WebView to pull the latest deploy. */}
-          {Capacitor.isNativePlatform() && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => window.location.reload()}
-              aria-label="Check for updates"
-              title="Check for updates"
-            >
-              <RefreshCw className="h-5 w-5" />
-            </Button>
-          )}
+          {/* "Check for updates" (reload) lives in Settings only — removed from
+             the header to declutter (owner request). */}
           <Link href="/settings">
             <Button
               variant="ghost"
