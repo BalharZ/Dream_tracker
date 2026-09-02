@@ -368,6 +368,23 @@
 
 ---
 
+### S36 — Dashboard: propsání/uložení zvyků (#18)
+**Soubory:** `src/components/habits/today-habits.tsx`
+**Zadání:** vyplnění zvyku z dashboardu (`TodayHabits`) se „neuloží / nepropíše".
+**Zjištění:** samotný write-pipeline v `today-habits.tsx` byl **logicky totožný** s funkční Habits stránkou — stejný `upsert` na `habit_progress` (onConflict `habit_id,user_id,date`), stejný `update habits.current_value` i stejné `recomputeProgress(userId)` → data se do DB i do kaskády cíl/sen zapisují stejně. Problém tedy nebyl v „že mutace neexistuje", ale ve **slabých místech dashboard cesty**, která na mobilu vede k dojmu „neuložilo se":
+1. **Tichá selhání:** mutace neměla `onError` ani žádnou zpětnou vazbu — když zápis selhal (síť/RLS/výjimka v recompute), uživatel nic nepoznal.
+2. **Ztráta debounced zápisu při rychlé navigaci:** hodnota ze stepperu/psaní se ukládá s 700 ms debounce. Když uživatel na mobilu hned po úpravě přepne přes spodní lištu jinam, komponenta se odmountuje a naplánovaný zápis se buď ztratí, nebo proběhne proti odmountované mutaci (bez invalidace cache).
+3. **Reseed přepisoval rozdělanou hodnotu:** `useEffect` seedující `values` ze serveru dělal `setValues(todayProgress)` = celý přepis; při souběhu s rozepsanou editací hodnota „skočila zpět".
+
+✅ **Hotovo (2026-09-02)** — **BEZ SQL** (jen klient):
+1. **Extrahován `saveProgress(habitId, value)`** jako čistá async funkce (upsert → `current_value` → `recomputeProgress`), kterou volá jak mutace, tak flush při odmountu. `saveProgressRef` drží vždy aktuální verzi (aktuální `user`/`dateStr`), aby flush po odmountu nepoužil zastaralý closure z mount renderu.
+2. **`onError` toast** u `updateProgress` (destructive „Couldn't save…") → selhání zápisu je nově vidět. Doplněna i invalidace `habit_progress_all` (kvůli případným streak/agregacím).
+3. **Flush rozdělaných zápisů při odmountu:** ref `pending` drží hodnoty naplánované, ale ještě nezapsané; cleanup effect při odmountu zruší timery a zbylé `pending` dopíše přímo přes `saveProgressRef.current` (nezávisle na tom, že je komponenta pryč). `commit` po odpálení mutace `pending` maže.
+4. **Nedestruktivní reseed:** seedující effect nově merguje server data, ale **ponechá hodnoty zvyků, které mají rozdělanou editaci** (`pending`), takže hodnota při souběžném refetchi „neskočí zpět".
+**Ověřeno:** `tsc --noEmit` bez chyb; `vite build` prošel (✓ built 51 s); dev server načte app čistě, konzole bez chyb (samotný zápis je za přihlášením + Supabase daty — DB byla během session dočasně nedostupná přes MCP, konstrukci upsertu ale ověřuje shodná funkční cesta na Habits stránce). **K doověření majitelem:** na telefonu vyplnit zvyk z dashboardu (stepper i ✓), přejít hned na jinou záložku → hodnota zůstane uložená a projeví se v Habits i v progresu cíle/snu; při výpadku sítě přijde toast „Couldn't save".
+
+---
+
 ## Backlog — audit seznamu úprav (2026-08-30)
 
 > Audit seznamu 19 úprav od majitele proti aktuálnímu kódu. Legenda: ✅ hotovo · ⚠️ bug/regrese (kód existuje, ale nefunguje jak má) · ❌ nezačato (nová funkce). Body rozkouskované do samostatných budoucích sessionů (S33+) tak, aby každá byla nezávislá a šetřila tokeny — po resetu stačí říct číslo/název sessionu.
@@ -392,7 +409,7 @@
 | 15 | Shluky podcílů v habits zmizely (regrese) | ✅ hotovo (S35, 2026-08-30) | S35 |
 | 16 | Group zvyk: default vytažená klávesnice + plusko utíká pod rukou | ✅ hotovo (S34, 2026-08-30) | S34 |
 | 17 | Týdenní zvyk: Nx/týden, odměna po každém, na konci týdne speciální losování (diamant 10 %, volba odměny) | ❌ (jen daily/weekly select) | S43 |
-| 18 | Nefunguje propsání/uložení zvyků z dashboardu | ⚠️ (`today-habits.tsx` mutace existuje, ladit) | S36 |
+| 18 | Nefunguje propsání/uložení zvyků z dashboardu | ✅ hotovo (S36, 2026-09-02) | S36 |
 | 19 | Snowball: nespustí se výherní animace + target svítí 0 | ⚠️ | S37 |
 
 ### Rozkouskovaný plán (priorita: nejdřív bugy/bolest, pak funkce)
@@ -401,7 +418,7 @@
 - [x] **S33 — Notifikace: jen z appky, vypnout web push, opravit timing/duplikáty** (#6, #8) ✅ 2026-08-30 (viz sekce S33 níže).
 - [x] **S34 — Habits mobil: overflow doleva + klávesnice/plus jumping** (#7, #16) ✅ 2026-08-30 (viz sekce S34 níže).
 - [x] **S35 — Podcíle/shluky: regrese + součet hlavního čísla** (#2, #15) ✅ 2026-08-30 (viz sekce S35 níže).
-- [ ] **S36 — Dashboard: propsání/uložení zvyků** (#18). `src/components/habits/today-habits.tsx` — `updateProgress` mutace existuje, ale zápis se neprojeví; ladit save-timer/invalidate/kaskádu progresu.
+- [x] **S36 — Dashboard: propsání/uložení zvyků** (#18) ✅ 2026-09-02 (viz sekce S36 níže).
 - [ ] **S37 — Snowball: decay + oprava animace/target 0 + dokumentace** (#9, #19). Přidat pokles targetu, když se zvyk nevyplní; opravit, proč se nespustí výherní animace a proč target v tabulce = 0. Doplnit stručný popis jak snowball funguje. Soubory: `src/lib/snowball.ts`, ruleta/animace v `reward-roulette.tsx`.
 
 **P2 — UI/UX a menší funkce**

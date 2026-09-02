@@ -11,6 +11,7 @@ import { Habit, Goal, Reward } from "@shared/schema";
 import { supabase } from "@/lib/supabase";
 import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
 import { recomputeProgress } from "@/lib/progress";
 import { applySnowballGrowth } from "@/lib/snowball";
 import { syncHabitReminders } from "@/lib/local-notifications";
@@ -24,8 +25,30 @@ import { RewardRoulette } from "@/components/habits/reward-roulette";
  */
 export function TodayHabits() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const today = new Date();
   const dateStr = format(today, "yyyy-MM-dd");
+
+  // Raw write used by both the mutation and the unmount flush. Kept as a plain
+  // function (not tied to the mutation observer) so a pending save can still be
+  // persisted after the component is torn down — e.g. the user edits a value on
+  // the dashboard and immediately navigates away before the debounce fires.
+  const saveProgress = async (habitId: number, value: number) => {
+    const { error } = await supabase
+      .from("habit_progress")
+      .upsert(
+        { habit_id: habitId, user_id: user!.id, date: dateStr, value },
+        { onConflict: "habit_id,user_id,date" }
+      );
+    if (error) throw error;
+
+    await supabase.from("habits").update({ current_value: value }).eq("id", habitId);
+    await recomputeProgress(user!.id);
+  };
+  // Always points at the latest saveProgress so the unmount flush uses the
+  // current user/date, not the closure from the mount render.
+  const saveProgressRef = useRef(saveProgress);
+  saveProgressRef.current = saveProgress;
 
   const { data: habits, isLoading } = useQuery({
     queryKey: ["habits", user?.id],
@@ -108,33 +131,47 @@ export function TodayHabits() {
 
   // Local, editable copy of today's values keyed by habit id.
   const [values, setValues] = useState<Record<number, number | string>>({});
+  const saveTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
+  // Values typed/tapped but not yet persisted, keyed by habit id. Used to keep
+  // the server reseed from clobbering an in-flight edit and to flush pending
+  // writes on unmount.
+  const pending = useRef<Record<number, number>>({});
+
+  // Seed from the server, but never overwrite a habit the user is mid-editing
+  // (its debounced save hasn't landed yet), otherwise the value would visibly
+  // jump back and feel like it didn't save.
   useEffect(() => {
-    if (todayProgress) setValues(todayProgress);
+    if (!todayProgress) return;
+    setValues((prev) => {
+      const next: Record<number, number | string> = { ...todayProgress };
+      for (const id of Object.keys(pending.current)) {
+        next[Number(id)] = prev[Number(id)];
+      }
+      return next;
+    });
   }, [todayProgress]);
 
   const [showRoulette, setShowRoulette] = useState(false);
   const [rouletteHabit, setRouletteHabit] = useState<Habit | null>(null);
-  const saveTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
 
   const updateProgress = useMutation({
     mutationFn: async ({ habitId, value }: { habitId: number; value: number }) => {
-      const { error } = await supabase
-        .from("habit_progress")
-        .upsert(
-          { habit_id: habitId, user_id: user!.id, date: dateStr, value },
-          { onConflict: "habit_id,user_id,date" }
-        );
-      if (error) throw error;
-
-      await supabase.from("habits").update({ current_value: value }).eq("id", habitId);
-
-      await recomputeProgress(user!.id);
+      await saveProgress(habitId, value);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["habits"] });
       queryClient.invalidateQueries({ queryKey: ["goals"] });
       queryClient.invalidateQueries({ queryKey: ["dreams"] });
       queryClient.invalidateQueries({ queryKey: ["habit_progress_today"] });
+      queryClient.invalidateQueries({ queryKey: ["habit_progress_all"] });
+    },
+    onError: (error) => {
+      console.error("Error saving today's habit:", error);
+      toast({
+        variant: "destructive",
+        title: "Couldn't save",
+        description: "Your change wasn't saved. Check your connection and try again.",
+      });
     },
   });
 
@@ -149,6 +186,7 @@ export function TodayHabits() {
     });
 
   const commit = (habit: Habit, value: number) => {
+    delete pending.current[habit.id];
     updateProgress.mutate({ habitId: habit.id, value });
     if (value >= habit.target_value && habitHasRewards(habit.id)) {
       setRouletteHabit(habit);
@@ -159,6 +197,7 @@ export function TodayHabits() {
   const handleChange = (habit: Habit, raw: number | string) => {
     setValues((prev) => ({ ...prev, [habit.id]: raw }));
     const numeric = raw === "" || typeof raw === "string" ? Number(raw) || 0 : raw;
+    pending.current[habit.id] = numeric;
     if (saveTimers.current[habit.id]) clearTimeout(saveTimers.current[habit.id]);
     saveTimers.current[habit.id] = setTimeout(() => commit(habit, numeric), 700);
   };
@@ -168,6 +207,24 @@ export function TodayHabits() {
     setValues((prev) => ({ ...prev, [habit.id]: habit.target_value }));
     commit(habit, habit.target_value);
   };
+
+  // Flush any debounced-but-uncommitted edits when the component unmounts (e.g.
+  // the user edits a value then immediately switches tab). Writes go straight
+  // through saveProgress so they don't depend on the mutation still being
+  // mounted; the query cache refreshes on the next visit.
+  useEffect(() => {
+    const timers = saveTimers.current;
+    const pendingRef = pending.current;
+    return () => {
+      Object.values(timers).forEach((t) => clearTimeout(t));
+      Object.entries(pendingRef).forEach(([id, value]) => {
+        saveProgressRef.current(Number(id), value).catch((error) =>
+          console.error("Error flushing pending habit save:", error)
+        );
+      });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Only show habits whose goal still exists (mirrors the Habits page filter).
   const visibleHabits = (habits || []).filter((habit) => {
