@@ -409,6 +409,19 @@
 
 ---
 
+### S46 — Tabulka zvyků se posouvá celá
+**Soubory:** `habits-page.tsx` — zrušen `sticky` u sloupců Habit/Target, tabulka se posouvá do boku jako celek (vrací rozhodnutí z S34). ✅ 2026-10-23
+
+### S47 — Statistiky zvyků (tlačítko Stats)
+**Soubory:** nové `src/lib/habit-stats.ts` (čisté výpočty), `src/components/habits/habit-stats.tsx` (dialog), `habits-page.tsx` (tlačítko vlevo od „Load more history")
+✅ **Hotovo (2026-10-23)** — **BEZ SQL**:
+- **Přehled:** průměrná úspěšnost za 30 dní (prstenec), nejdelší běžící série, nejlepší série všech dob; karta každého zvyku s prstencem 30denní úspěšnosti, 🔥 aktuální série, 🏆 nejlepší série, trend vs předchozích 30 dní a pruh posledních 28 dní.
+- **Detail (po kliknutí na zvyk):** KPI dlaždice, „Getting better or worse?" (7/14/30 dní vs předchozí stejné období), graf hodnot s čárou targetu a volbou 30 d / 3 m / 6 m / 1 y (nad 90 dní týdenní průměr), donut Done/Partial/Missed, úspěšnost podle dne v týdnu, roční kalendář (53 týdnů, posun doprava = dnes), top 5 nejdelších sérií.
+- „Splněno" = hodnota ≥ aktuální target (u snowballu tedy podle dnešní laťky). Dnešek se počítá jen když je splněný. Historie se načítá stránkovaně (obchází limit 1000 řádků Supabase).
+**Ověřeno:** `tsc` + `vite build` OK; vzhled ověřen na dočasné náhledové stránce s ukázkovými daty (desktop i 375 px), stránka pak odstraněna.
+
+---
+
 ## Backlog — audit seznamu úprav (2026-08-30)
 
 > Audit seznamu 19 úprav od majitele proti aktuálnímu kódu. Legenda: ✅ hotovo · ⚠️ bug/regrese (kód existuje, ale nefunguje jak má) · ❌ nezačato (nová funkce). Body rozkouskované do samostatných budoucích sessionů (S33+) tak, aby každá byla nezávislá a šetřila tokeny — po resetu stačí říct číslo/název sessionu.

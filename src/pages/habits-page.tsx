@@ -7,12 +7,13 @@ import { Habit, Goal, Reward } from "@shared/schema";
 import { supabase } from "@/lib/supabase";
 import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
-import { ChevronRight, Flame, Medal, TrendingUp } from "lucide-react";
+import { BarChart3, ChevronRight, Flame, Medal, TrendingUp } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { HabitForm } from "@/components/habits/habit-form";
 import { NumberStepper } from "@/components/ui/number-stepper";
 import { RewardRoulette } from "@/components/habits/reward-roulette";
+import { HabitStatsDialog } from "@/components/habits/habit-stats";
 import { recomputeProgress } from "@/lib/progress";
 import { applySnowballGrowth } from "@/lib/snowball";
 import { computeStreak, isConsolidated, CONSOLIDATION_DAYS } from "@/lib/streaks";
@@ -83,6 +84,7 @@ function HabitsPage() {
   const [noRewardAlertHabit, setNoRewardAlertHabit] = useState<number | null>(null);
   const [hiddenAlerts, setHiddenAlerts] = useState<number[]>([]);
   const [numberOfDays, setNumberOfDays] = useState(30);
+  const [statsOpen, setStatsOpen] = useState(false);
   const { toast } = useToast();
 
   const daysToShow = Array.from({ length: numberOfDays }, (_, i) => {
@@ -390,7 +392,11 @@ function HabitsPage() {
             </div>
           </div>
 
-          <div className="flex justify-end mt-4 px-4 pb-4 sm:px-0 sm:pb-0">
+          <div className="flex justify-end gap-2 mt-4 px-4 pb-4 sm:px-0 sm:pb-0">
+            <Button variant="outline" onClick={() => setStatsOpen(true)}>
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Stats
+            </Button>
             <Button
               variant="outline"
               onClick={() => setNumberOfDays(prev => prev + 30)}
@@ -424,6 +430,8 @@ function HabitsPage() {
           rewards={rewards || []}
         />
       )}
+
+      <HabitStatsDialog open={statsOpen} onOpenChange={setStatsOpen} habits={habits || []} />
 
       {selectedHabit && (
         <EditProgressDialog
