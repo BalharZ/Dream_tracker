@@ -241,11 +241,9 @@ function HabitsPage() {
           <div className="relative">
             {/* Horizontally scrollable grid */}
             <div className="flex overflow-x-auto">
-              {/* Habit + Target columns — frozen to the left so the habit name
-                  stays visible while the date grid scrolls (owner report #7:
-                  the habit used to run off the left edge on mobile). Opaque
-                  bg-card so scrolling date cells don't show through. */}
-              <div className="flex-shrink-0 border-r sticky left-0 z-10 bg-card">
+              {/* Habit + Target columns — scroll together with the date grid,
+                  so the whole table moves sideways as one (owner request). */}
+              <div className="flex-shrink-0 border-r bg-card">
                 {/* Header row */}
                 <div className="flex border-b">
                   <div className="w-44 sm:w-56 px-2 sm:px-3 py-3 text-sm font-medium text-muted-foreground">Habit</div>
