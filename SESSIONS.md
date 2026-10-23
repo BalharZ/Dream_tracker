@@ -427,6 +427,13 @@ Detail viz `docs/NAMING.md` (sekce „Provedeno"). Viditelný název → Northst
 
 ---
 
+### S49 — Dashboard: karty snů s obrázkem, bez Goals progress
+**Soubory:** nové `src/components/dreams/dream-showcase.tsx`, `src/components/ui/progress-ring.tsx` (sdílený prstenec, používá i `habit-stats.tsx`), `home-page.tsx`
+✅ 2026-10-23 — sekce „Your dreams": čtvercová karta pro každý sen, obrázek celý (`object-contain`) přes rozmazanou kopii sebe sama, dole název + pozitivní motivace a zlatý prstenec s % (100 % → ✓ a štítek „Achieved"). Na telefonu vodorovně posuvná řada se „snap", od `sm` mřížka 2–3 sloupce. Sekce „Goals Progress" z dashboardu odebrána. Ověřeno na dočasné náhledové stránce (desktop + 375 px), `tsc` + `vite build` OK.
+**Pozn.:** složka projektu se jmenuje `Northstar Goals & Habits` — „&" rozbíjí npm/gradle `.cmd` skripty. Do přejmenování spouštět přímo: `node node_modules/typescript/bin/tsc --noEmit`, `node node_modules/vite/bin/vite.js build`; APK přes `subst N: "<složka>"` a `N:\android\gradlew.bat assembleDebug` (z adresáře `N:\android`). `.claude/launch.json` spouští vite přes node.
+
+---
+
 ## Backlog — audit seznamu úprav (2026-08-30)
 
 > Audit seznamu 19 úprav od majitele proti aktuálnímu kódu. Legenda: ✅ hotovo · ⚠️ bug/regrese (kód existuje, ale nefunguje jak má) · ❌ nezačato (nová funkce). Body rozkouskované do samostatných budoucích sessionů (S33+) tak, aby každá byla nezávislá a šetřila tokeny — po resetu stačí říct číslo/název sessionu.

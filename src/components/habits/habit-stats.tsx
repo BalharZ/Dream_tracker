@@ -21,6 +21,7 @@ import type { Habit } from "@shared/schema";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { ProgressRing } from "@/components/ui/progress-ring";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/use-auth";
 import { computeStreak, type ValuesByDate } from "@/lib/streaks";
@@ -122,31 +123,7 @@ export function HabitStatsDialog({
 
 /* ---------------------------------------------------------------- overview */
 
-function Ring({ value, color, size = 56, stroke = 6, children }: {
-  value: number; color: string; size?: number; stroke?: number; children?: React.ReactNode;
-}) {
-  const r = (size - stroke) / 2;
-  const c = 2 * Math.PI * r;
-  return (
-    <div className="relative shrink-0" style={{ width: size, height: size }}>
-      <svg width={size} height={size} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="hsl(var(--muted))" strokeWidth={stroke} />
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={r}
-          fill="none"
-          stroke={color}
-          strokeWidth={stroke}
-          strokeLinecap="round"
-          strokeDasharray={`${c * Math.min(1, value)} ${c}`}
-          className="transition-[stroke-dasharray] duration-700"
-        />
-      </svg>
-      <div className="absolute inset-0 flex items-center justify-center text-xs font-semibold">{children}</div>
-    </div>
-  );
-}
+const Ring = ProgressRing;
 
 function TrendBadge({ now, before }: { now: number; before: number | null }) {
   if (before === null) return <span className="text-xs text-muted-foreground">new</span>;
