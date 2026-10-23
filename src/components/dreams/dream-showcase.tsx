@@ -4,6 +4,7 @@ import type { Dream } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProgressRing } from "@/components/ui/progress-ring";
+import { cn } from "@/lib/utils";
 
 const GOLD = "#FFD666";
 
@@ -18,7 +19,7 @@ export function DreamShowcase({ dreams, isLoading }: { dreams?: Dream[]; isLoadi
     <section className="space-y-3">
       <div className="flex items-center justify-between">
         <h2 className="flex items-center gap-2 text-xl font-semibold">
-          <Star className="h-5 w-5 fill-yellow-400 text-yellow-500" />
+          <Star className="h-5 w-5 fill-gold text-gold" />
           Your dreams
         </h2>
         {!!dreams?.length && (
@@ -57,20 +58,27 @@ export function DreamShowcase({ dreams, isLoading }: { dreams?: Dream[]; isLoadi
 
 function Row({ children }: { children: React.ReactNode }) {
   return (
-    <div className="-mx-6 flex snap-x snap-mandatory scroll-px-6 gap-3 overflow-x-auto px-6 pb-2 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 lg:grid-cols-3">
+    <div className="-mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 lg:grid-cols-3">
       {children}
     </div>
   );
 }
 
-function DreamTile({ dream }: { dream: Dream }) {
+/**
+ * One dream as a picture tile. Without `onClick` it links to the Dreams page
+ * (dashboard); with it, it's a button (Dreams page opens the editor).
+ */
+type TileDream = Pick<Dream, "name" | "image" | "positive_motivation" | "progress">;
+
+export function DreamTile({ dream, onClick, className }: { dream: TileDream; onClick?: () => void; className?: string }) {
   const progress = Math.max(0, Math.min(100, dream.progress || 0));
   const done = progress >= 100;
-  return (
-    <Link
-      href="/dreams"
-      className="group relative block aspect-square w-[72%] shrink-0 snap-start overflow-hidden rounded-2xl bg-slate-900 shadow-sm ring-1 ring-black/5 transition-transform hover:-translate-y-0.5 hover:shadow-lg sm:w-auto"
-    >
+  const tileClass = cn(
+    "group relative block aspect-square w-[72%] shrink-0 snap-start overflow-hidden rounded-2xl bg-primary text-left shadow-card ring-1 ring-black/5 transition-transform hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:w-auto",
+    className
+  );
+  const content = (
+    <>
         {dream.image && (
           <>
             <img src={dream.image} alt="" aria-hidden className="absolute inset-0 h-full w-full scale-110 object-cover opacity-60 blur-xl" />
@@ -90,10 +98,15 @@ function DreamTile({ dream }: { dream: Dream }) {
           </ProgressRing>
         </div>
         {done && (
-          <span className="absolute left-3 top-3 rounded-full bg-yellow-400 px-2 py-0.5 text-[11px] font-semibold text-slate-900">
+          <span className="absolute left-3 top-3 rounded-full bg-gold px-2 py-0.5 text-[11px] font-semibold text-gold-foreground">
             Achieved
           </span>
         )}
-    </Link>
+    </>
+  );
+  return onClick ? (
+    <button type="button" onClick={onClick} className={tileClass}>{content}</button>
+  ) : (
+    <Link href="/dreams" className={tileClass}>{content}</Link>
   );
 }

@@ -434,6 +434,12 @@ Detail viz `docs/NAMING.md` (sekce „Provedeno"). Viditelný název → Northst
 
 ---
 
+### S50 — Jednotné dialogy (křížek + scroll + Zpět) a nový vzhled
+**Soubory:** `src/components/ui/dialog.tsx` (+ `dialog-no-close.tsx`, `alert-dialog.tsx`), tokeny `src/index.css` + `tailwind.config.ts`, písmo v `index.html`, `main-layout.tsx`, `button/card/input/textarea/select/progress.tsx`, `dream-showcase.tsx` (export `DreamTile`), `dreams-page.tsx`, nový `docs/DESIGN.md`
+✅ 2026-10-23 — **Bug:** detail snu s obrázkem byl na telefonu vyšší než obrazovka → křížek mimo obrazovku, nešlo scrollovat ani zavřít. Nově má každý dialog rám max. na výšku obrazovky, posouvá se jen tělo a **křížek je vždy vpravo nahoře**; **Zpět** (Android/prohlížeč) zavře horní dialog (záznam v historii na dialog). Vlastní `max-h`/`overflow` u dialogů odebrány. **Design:** design system v `docs/DESIGN.md` — paleta z ikony (navy / zlatá / nebeská), Plus Jakarta Sans, zaoblenější karty/tlačítka/pole, varianta tlačítka `gold`, tmavý sidebar se zlatou aktivní položkou, logo v hlavičce, „pilulka" v spodní navigaci. Stránka Dreams používá stejné dlaždice jako dashboard. Ověřeno na dočasné náhledové stránce (375×812, 375×520 – scroll, X i Zpět, desktop), `tsc` + `vite build` OK.
+
+---
+
 ## Backlog — audit seznamu úprav (2026-08-30)
 
 > Audit seznamu 19 úprav od majitele proti aktuálnímu kódu. Legenda: ✅ hotovo · ⚠️ bug/regrese (kód existuje, ale nefunguje jak má) · ❌ nezačato (nová funkce). Body rozkouskované do samostatných budoucích sessionů (S33+) tak, aby každá byla nezávislá a šetřila tokeny — po resetu stačí říct číslo/název sessionu.

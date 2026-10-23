@@ -239,7 +239,7 @@ function BrowseRewardsDialog() {
           Browse Rewards
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Browse Preset Rewards</DialogTitle>
         </DialogHeader>

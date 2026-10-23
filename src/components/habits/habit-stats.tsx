@@ -93,7 +93,8 @@ export function HabitStatsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         onOpenAutoFocus={(e) => e.preventDefault()}
-        className="flex h-[100dvh] max-w-3xl flex-col gap-0 overflow-hidden p-0 sm:h-[90vh]"
+        className="h-[100dvh] max-w-3xl sm:h-[90vh]"
+        bodyClassName="flex h-full flex-col gap-0 overflow-hidden p-0"
       >
         <div className="flex items-center gap-2 border-b px-4 py-3 pr-12">
           {selected ? (

@@ -1,5 +1,4 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,11 +7,11 @@ import { useForm } from "react-hook-form";
 import { supabase } from "@/lib/supabase";
 import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
-import { Progress } from "@/components/ui/progress";
 import { Plus, Loader2, Trash2, ImageIcon, X } from "lucide-react";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormDescription } from "@/components/ui/form";
 import { useState } from "react";
 import { ImageGallery } from "@/components/images/image-gallery";
+import { DreamTile } from "@/components/dreams/dream-showcase";
 
 type Dream = {
   id: number;
@@ -88,11 +87,12 @@ export default function DreamsPage() {
         </Dialog>
       </div>
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {dreams?.map((dream) => (
-          <DreamCard
+          <DreamTile
             key={dream.id}
             dream={dream}
+            className="w-full"
             onClick={() => {
               setSelectedDream(dream);
               setOpen(true);
@@ -101,43 +101,6 @@ export default function DreamsPage() {
         ))}
       </div>
     </div>
-  );
-}
-
-function DreamCard({ dream, onClick }: { dream: Dream; onClick: () => void }) {
-  return (
-    <Card className="cursor-pointer hover:border-primary/50 transition-colors" onClick={onClick}>
-      <CardContent className="pt-6">
-        {/* Square frame, whole image visible (no cropping). */}
-        <div className="w-full aspect-square rounded-lg bg-muted overflow-hidden flex items-center justify-center">
-          {dream.image && (
-            <img src={dream.image} alt={dream.name} className="w-full h-full object-contain" />
-          )}
-        </div>
-
-        <h3 className="text-xl font-semibold mb-2 mt-4">{dream.name}</h3>
-
-        {dream.positive_motivation && (
-          <p className="text-sm text-green-600 dark:text-green-400 mb-2">
-            ✨ {dream.positive_motivation}
-          </p>
-        )}
-
-        {dream.negative_motivation && (
-          <p className="text-sm text-red-600 dark:text-red-400 mb-4">
-            ⚠️ {dream.negative_motivation}
-          </p>
-        )}
-
-        <div className="space-y-2">
-          <div className="flex justify-between text-sm">
-            <span>Progress</span>
-            <span>{Math.round(dream.progress)}%</span>
-          </div>
-          <Progress value={dream.progress} />
-        </div>
-      </CardContent>
-    </Card>
   );
 }
 

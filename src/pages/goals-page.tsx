@@ -183,7 +183,7 @@ export default function GoalsPage() {
           <DialogTrigger asChild>
             <Button onClick={() => setSelectedGoal(null)}><Plus className="h-4 w-4 mr-2" />Add Goal</Button>
           </DialogTrigger>
-          <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <DialogContent>
             <DialogHeader><DialogTitle>{selectedGoal ? "Edit Goal" : "Add New Goal"}</DialogTitle></DialogHeader>
             <AddGoalForm dreams={dreams || []} goals={goals || []} goal={selectedGoal}
               onSuccess={() => { setOpen(false); setSelectedGoal(null); }} />

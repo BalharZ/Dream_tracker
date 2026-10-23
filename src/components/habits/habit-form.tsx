@@ -477,7 +477,6 @@ export function HabitForm({
         }}
       >
         <DialogContent
-          className="max-h-[90vh] overflow-y-auto"
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
           <DialogHeader>
@@ -1128,7 +1127,7 @@ export function HabitForm({
       </Dialog>
 
       <Dialog open={showRewardSelector} onOpenChange={setShowRewardSelector}>
-        <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Select Rewards</DialogTitle>
             <DialogDescription>

@@ -37,60 +37,40 @@ export default function MainLayout({
 
   return (
     <div className="min-h-screen flex">
-      {/* Desktop Sidebar */}
-      <aside className="hidden md:flex flex-col w-64 border-r bg-card">
-        <div className="p-6">
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent whitespace-nowrap">
-            Northstar
-          </h1>
+      {/* Desktop Sidebar — night sky, gold for the active item. */}
+      <aside className="hidden md:flex sticky top-0 h-screen flex-col w-64 shrink-0 bg-sidebar text-sidebar-foreground">
+        <div className="px-6 py-6">
+          <Brand className="text-white" />
         </div>
 
-        <nav className="flex-1 px-4 space-y-2">
+        <nav className="flex-1 px-3 space-y-1">
           {navigation.map((item) => (
-            <Link key={item.href} href={item.href}>
-              <Button
-                variant={location === item.href ? "default" : "ghost"}
-                className={cn(
-                  "flex items-center justify-start gap-3 px-3 py-2 text-sm font-medium w-full min-w-[180px]",
-                  location === item.href ? "bg-primary text-primary-foreground" : ""
-                )}
-              >
-                <item.icon className="h-5 w-5 shrink-0" />
-                <span className="truncate">{item.name}</span>
-              </Button>
-            </Link>
+            <SidebarLink key={item.href} href={item.href} icon={item.icon} active={location === item.href}>
+              {item.name}
+            </SidebarLink>
           ))}
         </nav>
 
-        <div className="p-4 border-t space-y-1">
+        <div className="p-3 border-t border-sidebar-border space-y-1">
           {!Capacitor.isNativePlatform() && (
-            <Button variant="ghost" className="w-full justify-start" asChild>
-              <a href={ANDROID_APK_URL} download="Northstar.apk">
-                <Download className="mr-2 h-5 w-5" />
-                Get Android app
-              </a>
-            </Button>
-          )}
-          <Link href="/settings">
-            <Button
-              variant={location === "/settings" ? "default" : "ghost"}
-              className={cn(
-                "w-full justify-start",
-                location === "/settings" ? "bg-primary text-primary-foreground" : ""
-              )}
+            <a
+              href={ANDROID_APK_URL}
+              download="Northstar.apk"
+              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
             >
-              <Settings className="mr-2 h-5 w-5" />
-              Settings
-            </Button>
-          </Link>
+              <Download className="h-5 w-5" />
+              Get Android app
+            </a>
+          )}
+          <SidebarLink href="/settings" icon={Settings} active={location === "/settings"}>
+            Settings
+          </SidebarLink>
         </div>
       </aside>
 
       {/* Mobile Top Bar */}
-      <header className="md:hidden fixed top-0 inset-x-0 z-40 flex items-center justify-between h-14 px-4 border-b bg-background/95 backdrop-blur-sm">
-        <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-          Northstar
-        </h1>
+      <header className="md:hidden fixed top-0 inset-x-0 z-40 flex items-center justify-between h-14 px-4 border-b border-border/70 bg-background/90 backdrop-blur-md">
+        <Brand />
         <div className="flex items-center">
           {/* Browser only: download the Android APK. */}
           {!Capacitor.isNativePlatform() && (
@@ -121,19 +101,26 @@ export default function MainLayout({
       </header>
 
       {/* Mobile Bottom Navigation */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 flex items-stretch border-t bg-background/95 backdrop-blur-sm pb-[env(safe-area-inset-bottom)]">
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 flex items-stretch border-t border-border/70 bg-card/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">
         {navigation.map((item) => {
           const active = location === item.href;
           return (
             <Link key={item.href} href={item.href} className="flex-1">
               <button
                 className={cn(
-                  "flex flex-col items-center justify-center gap-1 w-full h-14 text-[11px] font-medium transition-colors",
+                  "flex flex-col items-center justify-center gap-0.5 w-full h-16 text-[11px] font-semibold transition-colors",
                   active ? "text-primary" : "text-muted-foreground"
                 )}
                 aria-current={active ? "page" : undefined}
               >
-                <item.icon className="h-5 w-5 shrink-0" />
+                <span
+                  className={cn(
+                    "flex h-7 w-12 items-center justify-center rounded-full transition-colors",
+                    active && "bg-gold/40"
+                  )}
+                >
+                  <item.icon className="h-5 w-5 shrink-0" />
+                </span>
                 <span className="truncate">{item.name}</span>
               </button>
             </Link>
@@ -143,8 +130,45 @@ export default function MainLayout({
 
       {/* Main Content */}
       <main className="flex-1 min-h-screen min-w-0 overflow-x-hidden">
-        <div className="container mx-auto p-6 pt-20 pb-24 md:pt-6 md:pb-6">{children}</div>
+        <div className="container mx-auto max-w-6xl p-4 pt-20 pb-28 sm:p-6 sm:pt-20 md:pt-8 md:pb-8">{children}</div>
       </main>
     </div>
+  );
+}
+
+function Brand({ className }: { className?: string }) {
+  return (
+    <div className={cn("flex items-center gap-2.5", className)}>
+      <img src="/icons/icon-512.png" alt="" className="h-8 w-8 rounded-lg shadow-sm" />
+      <span className="font-display text-xl font-bold tracking-tight">Northstar</span>
+    </div>
+  );
+}
+
+function SidebarLink({
+  href,
+  icon: Icon,
+  active,
+  children,
+}: {
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  active: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      aria-current={active ? "page" : undefined}
+      className={cn(
+        "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
+        active
+          ? "bg-sidebar-primary text-sidebar-primary-foreground font-semibold"
+          : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+      )}
+    >
+      <Icon className="h-5 w-5 shrink-0" />
+      <span className="truncate">{children}</span>
+    </Link>
   );
 }
