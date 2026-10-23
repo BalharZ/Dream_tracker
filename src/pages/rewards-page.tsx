@@ -160,7 +160,7 @@ function RewardCard({ reward, onClick }: { reward: Reward; onClick: () => void }
       </div>
       <CardContent className="pt-6">
         <div
-          className="w-full h-32 mb-4 rounded-lg bg-muted overflow-hidden cursor-pointer flex items-center justify-center"
+          className="w-full aspect-square mb-4 rounded-lg bg-muted overflow-hidden cursor-pointer flex items-center justify-center"
           onClick={onClick}
         >
           {reward.image ? (
@@ -275,7 +275,7 @@ function BrowseRewardsDialog() {
                 }}
               >
                 <CardContent className="p-4">
-                  <div className="w-full h-24 mb-2 rounded-lg bg-muted overflow-hidden flex items-center justify-center">
+                  <div className="w-full aspect-square mb-2 rounded-lg bg-muted overflow-hidden flex items-center justify-center">
                     <img
                       src={reward.image}
                       alt={reward.name}
@@ -399,7 +399,7 @@ function AddRewardForm({
               </div>
 
               {field.value && (
-                <div className="mt-2 w-full h-40 rounded-md overflow-hidden border bg-muted flex items-center justify-center">
+                <div className="mt-2 w-full max-w-[240px] aspect-square rounded-md overflow-hidden border bg-muted flex items-center justify-center">
                   <img
                     src={field.value}
                     alt="Reward preview"

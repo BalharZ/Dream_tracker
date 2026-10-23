@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Habit, HabitSubitem, Goal, Reward } from "@shared/schema";
+import { Habit, Goal, Reward } from "@shared/schema";
 import { supabase } from "@/lib/supabase";
 import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
@@ -38,7 +38,6 @@ import { ImageGallery } from "@/components/images/image-gallery";
 import { conversionFactor, isTimeUnit, sameTimeUnit, timeAltUnit } from "@/lib/units";
 import { getChance, getQuantity, makeChanceEntry, parseHabitChances } from "@/lib/habit-chances";
 import { increaseSnowballNow } from "@/lib/snowball";
-import { escalationDue, snoozeEscalation } from "@/lib/habit-clusters";
 import {
   isNativeApp,
   ensureNotificationPermission,
@@ -46,15 +45,6 @@ import {
   scheduleHabitReminder,
   cancelHabitReminder,
 } from "@/lib/local-notifications";
-
-// Editable sub-exercise row; id is set for rows loaded from the DB.
-// or_group: OR cluster number (null = required individually / AND).
-type SubitemDraft = {
-  id?: number;
-  name: string;
-  target: number | string;
-  or_group: number | null;
-};
 
 export function HabitForm({
   goals,
@@ -87,38 +77,6 @@ export function HabitForm({
   const [newRewardName, setNewRewardName] = useState("");
   const [newRewardImage, setNewRewardImage] = useState("");
   const [rewardGalleryOpen, setRewardGalleryOpen] = useState(false);
-  const [subitems, setSubitems] = useState<SubitemDraft[]>([]);
-
-  // Existing sub-exercises of the edited habit (synced on save: update by id,
-  // insert new, delete removed).
-  const { data: existingSubitems } = useQuery({
-    queryKey: ["habit_subitems", habit?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("habit_subitems")
-        .select("*")
-        .eq("habit_id", habit!.id)
-        .order("position", { ascending: true })
-        .order("id", { ascending: true });
-      if (error) throw error;
-      return data as HabitSubitem[];
-    },
-    enabled: !!habit,
-  });
-
-  useEffect(() => {
-    if (habit) {
-      setSubitems(
-        (existingSubitems || []).map((s) => ({
-          id: s.id,
-          name: s.name,
-          target: s.target,
-          or_group: s.or_group ?? null,
-        }))
-      );
-    }
-  }, [habit, existingSubitems]);
-
   // Distribute ~50% across the selected rewards (evenly) and leave ~50% for
   // the "no reward" outcome. Re-runs whenever rewards are added/removed.
   const distributeChances = (ids: number[]): Record<number, number> => {
@@ -224,7 +182,6 @@ export function HabitForm({
       setSelectedRewards([]);
       setRewardChances({});
       setRewardQuantities({});
-      setSubitems([]);
     }
   }, [habit, rewards]);
 
@@ -263,16 +220,11 @@ export function HabitForm({
         ...(notifyChanged ? { last_notified_date: null } : {}),
       };
 
-      // Adding a new sub-exercise while an escalation is due counts as the
-      // escalation itself, so the offer interval restarts automatically.
-      const addedSubitem = subitems.some((s) => !s.id && s.name.trim());
       const escalationAnchor = !escDays
         ? null
         : !habit || !habit.escalation_days
           ? todayStr // (re)enabled now → start the interval today
-          : escalationDue(habit) && addedSubitem
-            ? todayStr
-            : habit.last_escalation_at;
+          : habit.last_escalation_at;
 
       if (habit) {
         const { data, error } = await supabase
@@ -309,57 +261,6 @@ export function HabitForm({
         if (error) throw error;
         newHabit = data as Habit;
       }
-
-      // Sync sub-exercises: update existing rows by id, insert new ones,
-      // delete the removed ones.
-      const cleaned = subitems
-        .map((s, i) => {
-          const target = Number(s.target);
-          return {
-            id: s.id,
-            name: s.name.trim(),
-            target: Number.isFinite(target) && target > 0 ? target : 1,
-            position: i,
-            or_group: s.or_group,
-          };
-        })
-        .filter((s) => s.name);
-      const keepIds = new Set(cleaned.filter((s) => s.id).map((s) => s.id!));
-      const removed = (existingSubitems || []).filter((s) => !keepIds.has(s.id));
-      const subitemOps: PromiseLike<unknown>[] = [];
-      if (removed.length > 0) {
-        subitemOps.push(
-          supabase.from("habit_subitems").delete().in("id", removed.map((s) => s.id))
-        );
-      }
-      for (const s of cleaned) {
-        if (s.id) {
-          subitemOps.push(
-            supabase
-              .from("habit_subitems")
-              .update({
-                name: s.name,
-                target: s.target,
-                position: s.position,
-                or_group: s.or_group,
-              })
-              .eq("id", s.id)
-          );
-        } else {
-          subitemOps.push(
-            supabase.from("habit_subitems").insert({
-              habit_id: newHabit.id,
-              user_id: user!.id,
-              name: s.name,
-              target: s.target,
-              unit: "",
-              position: s.position,
-              or_group: s.or_group,
-            })
-          );
-        }
-      }
-      await Promise.all(subitemOps);
 
       if (!noRewards && selectedRewards.length > 0) {
         for (const rewardId of selectedRewards) {
@@ -412,7 +313,6 @@ export function HabitForm({
 
       queryClient.invalidateQueries({ queryKey: ["habits"] });
       queryClient.invalidateQueries({ queryKey: ["rewards"] });
-      queryClient.invalidateQueries({ queryKey: ["habit_subitems"] });
 
       if (newHabit.goal_id) {
         queryClient.invalidateQueries({ queryKey: ["goals"] });
@@ -514,29 +414,6 @@ export function HabitForm({
       toast({
         title: "Error!",
         description: "Failed to create reward.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  // "Later" on a due escalation offer: restart the interval and close the
-  // dialog (the habit prop would be stale).
-  const snoozeEscalationNow = useMutation({
-    mutationFn: async () => snoozeEscalation(habit!.id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["habits"] });
-      toast({
-        title: "Escalation snoozed",
-        description: `You'll be reminded again in ${habit?.escalation_days} days.`,
-      });
-      onSuccess();
-      setDialogOpen(false);
-    },
-    onError: (error) => {
-      console.error(error);
-      toast({
-        title: "Error!",
-        description: "Failed to snooze the escalation.",
         variant: "destructive",
       });
     },
@@ -1017,61 +894,6 @@ export function HabitForm({
                 </p>
               </div>
 
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <FormLabel>Sub-exercises (optional)</FormLabel>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      setSubitems((prev) => [...prev, { name: "", target: 1, or_group: null }])
-                    }
-                  >
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Add sub-exercise
-                  </Button>
-                </div>
-                {subitems.length > 0 && (
-                  <div className="space-y-2 border p-3 rounded-md">
-                    {subitems.map((s, i) => (
-                      <div key={s.id ?? `new-${i}`} className="flex items-center gap-2">
-                        <Input
-                          placeholder="e.g. Push-ups"
-                          value={s.name}
-                          className="flex-1"
-                          onChange={(e) =>
-                            setSubitems((prev) =>
-                              prev.map((row, idx) =>
-                                idx === i ? { ...row, name: e.target.value } : row
-                              )
-                            )
-                          }
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-9 w-9 shrink-0"
-                          onClick={() =>
-                            setSubitems((prev) => prev.filter((_, idx) => idx !== i))
-                          }
-                          aria-label="Remove sub-exercise"
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                    <p className="text-xs text-muted-foreground">
-                      Optional. Each sub-exercise is a different way to reach the target.
-                      When you log a day you enter how many of each you did and they add up
-                      toward the target above (e.g. target 5: 5 push-ups is enough; 5 push-ups
-                      + 5 squats counts as 10).
-                    </p>
-                  </div>
-                )}
-              </div>
-
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <FormLabel>Rewards</FormLabel>
@@ -1353,7 +1175,7 @@ export function HabitForm({
                   </Button>
                 </div>
                 {newRewardImage && (
-                  <div className="w-full h-28 rounded-md overflow-hidden border bg-muted flex items-center justify-center">
+                  <div className="w-full max-w-[240px] aspect-square rounded-md overflow-hidden border bg-muted flex items-center justify-center">
                     <img
                       src={newRewardImage}
                       alt="Reward preview"

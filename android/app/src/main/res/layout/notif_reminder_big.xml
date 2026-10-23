@@ -1,12 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Expanded habit-reminder notification: dream image on top (as close to full
-     width as the decoration allows), then the title and the FULL motivation
-     text. Wrapped by DecoratedCustomViewStyle, which supplies the
+<!-- Expanded habit-reminder notification: dream image on top in a square
+     frame, shown WHOLE (fitCenter, no cropping), then the title and the FULL
+     motivation text. Wrapped by DecoratedCustomViewStyle, which supplies the
      app-name/time/icon header.
-     The image uses negative side margins to break out of the ~16dp content
-     padding so it reaches the notification edges; the text keeps a small inset
-     for readability. Image height is kept small so more text lines fit before
-     the system's max notification height clips them. -->
+     The square is kept modest (160dp) so text lines still fit before the
+     system's max notification height clips them. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -14,12 +12,11 @@
 
     <ImageView
         android:id="@+id/notif_image"
-        android:layout_width="match_parent"
-        android:layout_height="132dp"
-        android:layout_marginStart="-16dp"
-        android:layout_marginEnd="-16dp"
+        android:layout_width="160dp"
+        android:layout_height="160dp"
+        android:layout_gravity="center_horizontal"
         android:layout_marginBottom="8dp"
-        android:scaleType="centerCrop"
+        android:scaleType="fitCenter"
         android:adjustViewBounds="false"
         android:contentDescription="@null" />
 

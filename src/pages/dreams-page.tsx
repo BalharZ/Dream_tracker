@@ -108,10 +108,12 @@ function DreamCard({ dream, onClick }: { dream: Dream; onClick: () => void }) {
   return (
     <Card className="cursor-pointer hover:border-primary/50 transition-colors" onClick={onClick}>
       <CardContent className="pt-6">
-        <div
-          className="w-full h-32 rounded-lg bg-cover bg-center"
-          style={{ backgroundImage: `url(${dream.image})` }}
-        />
+        {/* Square frame, whole image visible (no cropping). */}
+        <div className="w-full aspect-square rounded-lg bg-muted overflow-hidden flex items-center justify-center">
+          {dream.image && (
+            <img src={dream.image} alt={dream.name} className="w-full h-full object-contain" />
+          )}
+        </div>
 
         <h3 className="text-xl font-semibold mb-2 mt-4">{dream.name}</h3>
 
@@ -234,10 +236,9 @@ function AddDreamForm({ dream, onSuccess, onDelete }: { dream?: Dream | null; on
 
               {field.value && (
                 <div className="mt-2">
-                  <div
-                    className="relative w-full h-40 rounded-md overflow-hidden border"
-                    style={{ backgroundImage: `url(${field.value})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
-                  />
+                  <div className="w-full max-w-[240px] aspect-square rounded-md overflow-hidden border bg-muted flex items-center justify-center">
+                    <img src={field.value} alt="Dream preview" className="w-full h-full object-contain" />
+                  </div>
                 </div>
               )}
 

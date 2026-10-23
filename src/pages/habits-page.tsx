@@ -2,20 +2,12 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Habit, HabitSubitem, Goal, Reward } from "@shared/schema";
+import { Habit, Goal, Reward } from "@shared/schema";
 import { supabase } from "@/lib/supabase";
 import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
-import { Check, ChevronRight, Flame, Medal, StickyNote, TrendingUp } from "lucide-react";
-import {
-  buildUnits,
-  isUnitDone,
-  sumUnitValues,
-  escalationDue,
-  snoozeEscalation,
-} from "@/lib/habit-clusters";
+import { ChevronRight, Flame, Medal, StickyNote, TrendingUp } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { HabitForm } from "@/components/habits/habit-form";
@@ -456,10 +448,6 @@ function HabitsPage() {
             handleHabitProgress(selectedHabit.id, value, dateStr, target);
             setEditProgressDialogOpen(false);
           }}
-          onEditHabit={() => {
-            setEditProgressDialogOpen(false);
-            setHabitToEdit(selectedHabit);
-          }}
         />
       )}
     </div>
@@ -473,7 +461,6 @@ function EditProgressDialog({
   date,
   initialValue,
   onSave,
-  onEditHabit,
 }: {
   isOpen: boolean;
   onClose: () => void;
@@ -481,10 +468,8 @@ function EditProgressDialog({
   date: Date;
   initialValue: number;
   onSave: (value: number, target?: number) => void;
-  onEditHabit?: () => void;
 }) {
   const [value, setValue] = useState<number | string>(initialValue > 0 ? initialValue : '');
-  const dateStr = format(date, "yyyy-MM-dd");
 
   useEffect(() => {
     if (initialValue > 0) {
@@ -494,94 +479,8 @@ function EditProgressDialog({
     }
   }, [initialValue, isOpen]);
 
-  // Sub-exercises: named counters that all add up toward the habit's single
-  // target. e.g. target 5 → 5 push-ups is enough; 5 push-ups + 5 squats = 10.
-  const { data: subitems } = useQuery({
-    queryKey: ["habit_subitems", habit.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("habit_subitems")
-        .select("*")
-        .eq("habit_id", habit.id)
-        .order("position", { ascending: true })
-        .order("id", { ascending: true });
-      if (error) throw error;
-      return data as HabitSubitem[];
-    },
-    enabled: isOpen,
-  });
-
-  const { data: subitemDayValues } = useQuery({
-    queryKey: ["habit_subitem_progress", habit.id, dateStr],
-    queryFn: async () => {
-      const ids = (subitems || []).map((s) => s.id);
-      const { data, error } = await supabase
-        .from("habit_subitem_progress")
-        .select("subitem_id, value")
-        .eq("date", dateStr)
-        .in("subitem_id", ids);
-      if (error) throw error;
-      const map: Record<number, number> = {};
-      (data || []).forEach((p) => {
-        map[p.subitem_id] = p.value;
-      });
-      return map;
-    },
-    enabled: isOpen && !!subitems && subitems.length > 0,
-  });
-
-  const [subValues, setSubValues] = useState<Record<number, number | string>>({});
-  useEffect(() => {
-    setSubValues(subitemDayValues || {});
-  }, [subitemDayValues, isOpen, dateStr]);
-
-  const hasSubitems = !!subitems && subitems.length > 0;
-  const subNumeric = (id: number) => {
-    const v = subValues[id];
-    return typeof v === "string" ? Number(v) || 0 : v || 0;
-  };
-  // Group sub-exercises into units: standalone (AND) rows + OR clusters
-  // (complete any one). The habit's day value is the *summed real quantity*
-  // done across units (owner #2: "5 = 5", not the count of finished units),
-  // where an OR cluster counts only its best member.
-  const units = buildUnits(subitems || []);
-  const subitemTotal = sumUnitValues(units, subNumeric);
-
-  // Escalation offer (S13). Hidden locally after snoozing — the habit prop is
-  // stale until the habits query refetches.
-  const [escalationSnoozed, setEscalationSnoozed] = useState(false);
-  useEffect(() => {
-    setEscalationSnoozed(false);
-  }, [habit.id, isOpen]);
-  const showEscalation = escalationDue(habit) && !escalationSnoozed;
-  const handleSnoozeEscalation = async () => {
-    setEscalationSnoozed(true);
-    try {
-      await snoozeEscalation(habit.id);
-      queryClient.invalidateQueries({ queryKey: ["habits"] });
-    } catch (error) {
-      console.error("Error snoozing escalation:", error);
-    }
-  };
-
-  const handleSave = async () => {
-    if (hasSubitems) {
-      const rows = subitems!.map((s) => ({
-        subitem_id: s.id,
-        user_id: habit.user_id,
-        date: dateStr,
-        value: subNumeric(s.id),
-      }));
-      const { error } = await supabase
-        .from("habit_subitem_progress")
-        .upsert(rows, { onConflict: "subitem_id,user_id,date" });
-      if (error) console.error("Error saving sub-exercise progress:", error);
-      queryClient.invalidateQueries({ queryKey: ["habit_subitem_progress"] });
-      // The habit's day value is the summed quantity across units.
-      onSave(subitemTotal, habit.target_value);
-    } else {
-      onSave(typeof value === "string" ? 0 : value, habit.target_value);
-    }
+  const handleSave = () => {
+    onSave(typeof value === "string" ? Number(value) || 0 : value, habit.target_value);
   };
 
   return (
@@ -616,116 +515,19 @@ function EditProgressDialog({
             </p>
           )}
 
-          {showEscalation && (
-            <div className="rounded-md border border-amber-400 bg-amber-50 dark:bg-amber-950/30 p-2 space-y-2">
-              <p className="text-sm">
-                Time to escalate <span className="font-medium">{habit.name}</span> —
-                consider adding a sub-exercise or tightening an OR group.
-              </p>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" size="sm" onClick={handleSnoozeEscalation}>
-                  Later
-                </Button>
-                {onEditHabit && (
-                  <Button size="sm" onClick={onEditHabit}>
-                    Escalate (edit habit)
-                  </Button>
-                )}
-              </div>
-            </div>
-          )}
-
-          {hasSubitems ? (
-            <div className="space-y-2">
-              {units.map((unit) => {
-                const renderRow = (s: HabitSubitem) => {
-                  const done = subNumeric(s.id) >= (s.target || 1);
-                  return (
-                    <div
-                      key={s.id}
-                      className="flex items-center gap-2 rounded-md border p-2"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-medium">{s.name}</div>
-                        <div className="text-xs text-muted-foreground">
-                          Target: {s.target} {s.unit || habit.unit}
-                        </div>
-                      </div>
-                      {(s.target || 1) > 1 && (
-                        <NumberStepper
-                          min={0}
-                          value={subValues[s.id] ?? 0}
-                          onChange={(v) =>
-                            setSubValues((prev) => ({ ...prev, [s.id]: v }))
-                          }
-                          className="w-32 shrink-0"
-                          inputClassName="h-9"
-                          buttonClassName="h-9 w-9"
-                          aria-label={`${s.name} value`}
-                        />
-                      )}
-                      <Button
-                        size="icon"
-                        variant={done ? "default" : "outline"}
-                        className="shrink-0"
-                        style={done ? { backgroundColor: habit.color } : undefined}
-                        onClick={() =>
-                          setSubValues((prev) => ({
-                            ...prev,
-                            [s.id]: done ? 0 : s.target || 1,
-                          }))
-                        }
-                        aria-label={`Toggle ${s.name} done`}
-                        title={done ? "Mark as not done" : "Mark as done"}
-                      >
-                        <Check className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  );
-                };
-
-                if (unit.kind === "single") return renderRow(unit.subitem);
-
-                const orDone = isUnitDone(unit, subNumeric);
-                return (
-                  <div
-                    key={`or-${unit.group}`}
-                    className={`space-y-2 rounded-md border border-dashed p-2 ${
-                      orDone ? "border-green-500" : ""
-                    }`}
-                  >
-                    <p className="text-xs font-medium text-muted-foreground">
-                      OR group — complete any one{orDone ? " ✓" : ""}
-                    </p>
-                    {unit.members.map(renderRow)}
-                  </div>
-                );
-              })}
-              <p className="text-sm font-medium">
-                Total: {subitemTotal} / {habit.target_value} {habit.unit}
-              </p>
-            </div>
-          ) : (
-            <div className="flex items-center space-x-2">
-              <Input
-                type="number"
-                min={0}
-                placeholder="0"
-                value={value}
-                className="text-xl"
-                onChange={(e) => {
-                  const val = e.target.value === '' ? '' : parseFloat(e.target.value) || 0;
-                  setValue(val);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handleSave();
-                  }
-                }}
-              />
-              <span className="text-lg">{habit.unit}</span>
-            </div>
-          )}
+          {/* Simple single-value habit: +/- stepper (same as the dashboard). */}
+          <div className="flex items-center gap-2">
+            <NumberStepper
+              min={0}
+              value={value}
+              onChange={setValue}
+              className="flex-1"
+              inputClassName="h-12 text-xl"
+              buttonClassName="h-12 w-12"
+              aria-label={`${habit.name} value`}
+            />
+            <span className="text-lg">{habit.unit}</span>
+          </div>
 
           <div className="flex justify-end space-x-2 pt-4">
             <Button variant="outline" onClick={onClose}>

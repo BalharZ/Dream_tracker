@@ -385,6 +385,17 @@
 
 ---
 
+### S44 — Obrázky čtvercové a celé + jednoduchý zvyk se stepperem
+**Soubory:** `dreams-page.tsx`, `rewards-page.tsx`, `quick-rewards.tsx`, `habit-form.tsx`, `habits-page.tsx`, `notif_reminder_big.xml`, smazán `src/lib/habit-clusters.ts`
+✅ **Hotovo (2026-10-23)** — **BEZ SQL**:
+1. **Obrázky:** sny, odměny (karty, výběr ze seznamu, náhledy ve formulářích) i získané odměny jsou ve **čtvercovém rámečku** (`aspect-square`) a obrázek je vidět **celý** (`object-contain`, žádné ořezávání). Náhledy ve formulářích max. 240 px. (Nahrazuje původní zadání S39 „full šířka, výška auto".)
+2. **Notifikace (Android):** obrázek v rozbalené notifikaci je čtverec 160×160 dp uprostřed, `fitCenter` (celý, neořezaný). Projeví se až v novém APK.
+3. **Zvyk — dialog dne:** místo políčka `type=number` je `NumberStepper` s + / − (stejně jako na dashboardu).
+4. **Skupiny zvyků odstraněny:** z formuláře zvyku zmizela sekce „Sub-exercises", z dialogu dne AND/OR shluky i eskalační nabídka. Tabulky `habit_subitems` / `habit_subitem_progress` v DB zůstávají (nic se nemaže), appka je jen nepoužívá; denní hodnoty v `habit_progress` zůstaly beze změny.
+**Ověřeno:** `tsc --noEmit` bez chyb, `vite build` prošel. UI je za přihlášením, v prohlížeči neověřeno.
+
+---
+
 ## Backlog — audit seznamu úprav (2026-08-30)
 
 > Audit seznamu 19 úprav od majitele proti aktuálnímu kódu. Legenda: ✅ hotovo · ⚠️ bug/regrese (kód existuje, ale nefunguje jak má) · ❌ nezačato (nová funkce). Body rozkouskované do samostatných budoucích sessionů (S33+) tak, aby každá byla nezávislá a šetřila tokeny — po resetu stačí říct číslo/název sessionu.

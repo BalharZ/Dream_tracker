@@ -82,7 +82,7 @@ export function QuickRewards() {
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {earned.map((reward) => (
               <div key={reward.id} className="rounded-lg border overflow-hidden">
-                <div className="h-20 bg-muted flex items-center justify-center overflow-hidden">
+                <div className="aspect-square bg-muted flex items-center justify-center overflow-hidden">
                   {reward.image ? (
                     <img
                       src={reward.image}
