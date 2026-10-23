@@ -1,6 +1,11 @@
 # Naming – nápady a rozhodování
 
-Status: **nerozhodnuto** (2026-08-11). Aktuální název zůstává „Dream Tracker".
+Status: ✅ **rozhodnuto (2026-10-23): Northstar**
+- Na ploše telefonu / v aplikaci: **Northstar**
+- Titul ve výpisu Google Play: **Northstar: Goals & Habits** (25 znaků), česky **Northstar: Cíle a návyky** (24 znaků)
+- „vision board", „dreams", „streaks", „rewards" patří do krátkého popisu (80 znaků), ne do titulu (limit 30 znaků).
+- Zamítnuto: „Goal Tracker" / „Vision Tracker" (obecné, nedá se chránit, desítky stejných aplikací; „vision" se plete se zrakem), „Visions & Habits" (množné číslo zní anglicky divně).
+- Před zveřejněním na Google Play ověřit kolizi názvu s jinými aplikacemi / ochrannými známkami.
 
 ## Proč měnit
 „Dream Tracker" je zavádějící – „dream" si spousta lidí spojí se sny ze spánku.
@@ -44,3 +49,8 @@ Pokud na Play půjdeme:
 - `capacitor.config.ts` → `appName`
 - Ikona (viz níže) + případně splash
 - Texty notifikací / onboardingu, kde padá „Dream Tracker"
+
+## Provedeno (2026-10-23)
+- `strings.xml` (`app_name`, `title_activity_main`, `widget_empty`), `capacitor.config.ts` `appName`, `index.html` `<title>`, `manifest.webmanifest`, nadpisy v appce (`main-layout.tsx`, `auth-page.tsx`), texty u připomínek v `habit-form.tsx`, stažené APK se ukládá jako `Northstar.apk`.
+- **Ikona:** zlatá čtyřcípá severka + stoupající modré tečky (denní kroky k cíli) na noční modré. Generuje `scripts/generate-icons.py` (Pillow) → `public/icons/icon-512.png` (1024 px) + všechny `mipmap-*` (legacy, round, adaptive foreground); pozadí adaptivní ikony `#11224E`.
+- **Záměrně beze změny:** `appId` / Java balíček `com.dreamtracker.app` (změna = nová aplikace, ztráta instalací a widgetu), fallback e-maily `@dreamtracker.app` v `use-auth.tsx` (staré účty), URL `/DreamTracker.apk` (soubor generuje build), splash (`drawable*/splash.png`).

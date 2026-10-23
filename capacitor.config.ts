@@ -13,7 +13,7 @@ import type { CapacitorConfig } from "@capacitor/cli";
 // the remote page, so Preferences (and the widget handoff) keep working.
 const config: CapacitorConfig = {
   appId: "com.dreamtracker.app",
-  appName: "Dream Tracker",
+  appName: "Northstar",
   webDir: "dist",
   server: {
     url: "https://dream-tracker-ochre.vercel.app",

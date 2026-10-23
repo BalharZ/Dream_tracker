@@ -1,11 +1,11 @@
 {
-  "name": "Dream Tracker",
-  "short_name": "Dreams",
-  "description": "Track your dreams, goals and habits.",
+  "name": "Northstar: Goals & Habits",
+  "short_name": "Northstar",
+  "description": "Turn your dreams into goals and daily habits.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
+  "background_color": "#11224E",
   "theme_color": "#4299E1",
   "icons": [
     {

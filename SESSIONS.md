@@ -422,6 +422,11 @@
 
 ---
 
+### S48 — Přejmenování na Northstar + nová ikona
+Detail viz `docs/NAMING.md` (sekce „Provedeno"). Viditelný název → Northstar, titul webu „Northstar: Goals & Habits", nová ikona (`scripts/generate-icons.py`). `appId` a balíček beze změny. ✅ 2026-10-23 — nová ikona a název na telefonu se projeví až v novém APK.
+
+---
+
 ## Backlog — audit seznamu úprav (2026-08-30)
 
 > Audit seznamu 19 úprav od majitele proti aktuálnímu kódu. Legenda: ✅ hotovo · ⚠️ bug/regrese (kód existuje, ale nefunguje jak má) · ❌ nezačato (nová funkce). Body rozkouskované do samostatných budoucích sessionů (S33+) tak, aby každá byla nezávislá a šetřila tokeny — po resetu stačí říct číslo/název sessionu.

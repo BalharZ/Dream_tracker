@@ -39,9 +39,9 @@ export default function AuthPage() {
       <Card className="w-full max-w-4xl grid md:grid-cols-2 gap-6 p-6">
         <div className="flex flex-col justify-center space-y-6">
           <div className="space-y-2">
-            <h1 className="text-3xl font-bold">Dream Tracker</h1>
+            <h1 className="text-3xl font-bold">Northstar</h1>
             <p className="text-muted-foreground">
-              Track your dreams, set goals, and build habits that lead to success
+              Turn your dreams into goals and daily habits that get you there
             </p>
           </div>
 
@@ -51,7 +51,7 @@ export default function AuthPage() {
         <div className="hidden md:block relative">
           <div className="absolute inset-0 bg-gradient-to-br from-primary to-secondary opacity-20 rounded-lg" />
           <div className="relative p-6 text-center space-y-4">
-            <h2 className="text-2xl font-semibold">Why Dream Tracker?</h2>
+            <h2 className="text-2xl font-semibold">Why Northstar?</h2>
             <ul className="text-left space-y-2">
               <li>✨ Set and track meaningful life goals</li>
               <li>🎯 Break down dreams into achievable goals</li>

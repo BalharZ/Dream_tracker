@@ -824,7 +824,7 @@ export function HabitForm({
                       Every day at the chosen time your phone shows a notification with your
                       dream's image and your positive &amp; negative motivation.
                     </p>
-                    <p className="text-muted-foreground">Works in the Dream Tracker Android app.</p>
+                    <p className="text-muted-foreground">Works in the Northstar Android app.</p>
                   </InfoTip>
                   <input
                     type="checkbox"
@@ -845,7 +845,7 @@ export function HabitForm({
                           toast({
                             title: "Notifications blocked",
                             description:
-                              "Allow notifications for Dream Tracker in your phone's app settings to get reminders.",
+                              "Allow notifications for Northstar in your phone's app settings to get reminders.",
                             variant: "destructive",
                           });
                           return;
@@ -857,7 +857,7 @@ export function HabitForm({
                           toast({
                             title: "Reminders may be delayed",
                             description:
-                              "Allow “Alarms & reminders” for Dream Tracker so notifications fire at the exact time.",
+                              "Allow “Alarms & reminders” for Northstar so notifications fire at the exact time.",
                             variant: "destructive",
                           });
                         }
@@ -869,7 +869,7 @@ export function HabitForm({
                       toast({
                         title: "Reminders work in the app",
                         description:
-                          "This reminder will fire on your phone in the Dream Tracker app. Browser notifications are no longer used.",
+                          "This reminder will fire on your phone in the Northstar app. Browser notifications are no longer used.",
                       });
                     }}
                   />

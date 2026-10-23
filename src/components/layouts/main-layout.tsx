@@ -41,7 +41,7 @@ export default function MainLayout({
       <aside className="hidden md:flex flex-col w-64 border-r bg-card">
         <div className="p-6">
           <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent whitespace-nowrap">
-            Dream Tracker
+            Northstar
           </h1>
         </div>
 
@@ -65,7 +65,7 @@ export default function MainLayout({
         <div className="p-4 border-t space-y-1">
           {!Capacitor.isNativePlatform() && (
             <Button variant="ghost" className="w-full justify-start" asChild>
-              <a href={ANDROID_APK_URL} download="DreamTracker.apk">
+              <a href={ANDROID_APK_URL} download="Northstar.apk">
                 <Download className="mr-2 h-5 w-5" />
                 Get Android app
               </a>
@@ -89,7 +89,7 @@ export default function MainLayout({
       {/* Mobile Top Bar */}
       <header className="md:hidden fixed top-0 inset-x-0 z-40 flex items-center justify-between h-14 px-4 border-b bg-background/95 backdrop-blur-sm">
         <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-          Dream Tracker
+          Northstar
         </h1>
         <div className="flex items-center">
           {/* Browser only: download the Android APK. */}
@@ -97,7 +97,7 @@ export default function MainLayout({
             <Button variant="ghost" size="icon" asChild>
               <a
                 href={ANDROID_APK_URL}
-                download="DreamTracker.apk"
+                download="Northstar.apk"
                 aria-label="Get Android app"
                 title="Get Android app"
               >

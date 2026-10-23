@@ -86,7 +86,7 @@ export default function SettingsPage() {
           ) : (
             <div className="space-y-1">
               <Button variant="outline" className="w-full justify-start" asChild>
-                <a href={ANDROID_APK_URL} download="DreamTracker.apk">
+                <a href={ANDROID_APK_URL} download="Northstar.apk">
                   <Download className="mr-2 h-5 w-5" />
                   Get Android app
                 </a>

@@ -53,7 +53,7 @@ const presetRewards: Record<string, { name: string; image: string }[]> = {
     { name: "Special Brunch", image: "https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?q=80&w=1770&auto=format&fit=crop" },
   ],
   "Clothing & Accessories": [
-    { name: "Dream Tracker T-shirt", image: "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?q=80&w=1780&auto=format&fit=crop" },
+    { name: "Northstar T-shirt", image: "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?q=80&w=1780&auto=format&fit=crop" },
     { name: "Cozy Socks", image: "https://images.unsplash.com/photo-1586350977771-b3b0abd50c82?q=80&w=1780&auto=format&fit=crop" },
     { name: "Custom Bracelet", image: "https://images.unsplash.com/photo-1573408301185-9146fe634ad0?q=80&w=1769&auto=format&fit=crop" },
     { name: "Personalized Cap", image: "https://images.unsplash.com/photo-1521369909029-2afed882baee?q=80&w=1770&auto=format&fit=crop" },
