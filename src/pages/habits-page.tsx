@@ -7,7 +7,7 @@ import { Habit, Goal, Reward } from "@shared/schema";
 import { supabase } from "@/lib/supabase";
 import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
-import { ChevronRight, Flame, Medal, StickyNote, TrendingUp } from "lucide-react";
+import { ChevronRight, Flame, Medal, TrendingUp } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { HabitForm } from "@/components/habits/habit-form";
@@ -304,15 +304,6 @@ function HabitsPage() {
                           <span className="text-[10px] font-semibold leading-none">{streak}</span>
                         </span>
                       ) : null}
-                      {habit.notes && (
-                        <span
-                          title={habit.notes}
-                          aria-label="Habit notes"
-                          className="flex-shrink-0 text-muted-foreground"
-                        >
-                          <StickyNote className="h-3.5 w-3.5" />
-                        </span>
-                      )}
                     </div>
                     <div
                       className="w-14 sm:w-20 px-2 py-3 flex flex-col items-center justify-center cursor-pointer hover:bg-black/5"
@@ -505,13 +496,7 @@ function EditProgressDialog({
           {habit.habit_type === "snowball" && (
             <p className="text-xs text-muted-foreground flex items-center gap-1">
               <TrendingUp className="h-3 w-3" />
-              Snowball: +{habit.step_value ?? 0} every {habit.interval_days ?? 0} days
-            </p>
-          )}
-
-          {habit.notes && (
-            <p className="text-sm text-muted-foreground whitespace-pre-line border rounded-md p-2 bg-muted/50">
-              {habit.notes}
+              Snowball: ±{habit.step_value ?? 0} every {habit.interval_days ?? 0} days
             </p>
           )}
 

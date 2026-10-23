@@ -17,7 +17,6 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { NumberStepper } from "@/components/ui/number-stepper";
 import {
   Form,
@@ -37,7 +36,9 @@ import { Bell, Edit, Gift, Loader2, PlusCircle, X, Image as ImageIcon } from "lu
 import { ImageGallery } from "@/components/images/image-gallery";
 import { conversionFactor, isTimeUnit, sameTimeUnit, timeAltUnit } from "@/lib/units";
 import { getChance, getQuantity, makeChanceEntry, parseHabitChances } from "@/lib/habit-chances";
-import { increaseSnowballNow } from "@/lib/snowball";
+import { adjustSnowballNow } from "@/lib/snowball";
+import { InfoTip } from "@/components/ui/info-tip";
+import { HabitTypePicker } from "@/components/habits/habit-type-picker";
 import {
   isNativeApp,
   ensureNotificationPermission,
@@ -106,7 +107,6 @@ export function HabitForm({
       image: habit?.image || null as string | null,
       positive_motivation: habit?.positive_motivation || null as string | null,
       negative_motivation: habit?.negative_motivation || null as string | null,
-      notes: habit?.notes || "",
       habit_type: habit?.habit_type || "standard",
       base_target: (habit?.base_target ?? 0) as number | string,
       step_value: (habit?.step_value ?? 1) as number | string,
@@ -130,7 +130,6 @@ export function HabitForm({
         image: habit.image,
         positive_motivation: habit.positive_motivation,
         negative_motivation: habit.negative_motivation,
-        notes: habit.notes || "",
         habit_type: habit.habit_type || "standard",
         base_target: habit.base_target ?? 0,
         step_value: habit.step_value ?? 1,
@@ -169,7 +168,6 @@ export function HabitForm({
         image: null,
         positive_motivation: null,
         negative_motivation: null,
-        notes: "",
         habit_type: "standard",
         base_target: 0,
         step_value: 1,
@@ -209,7 +207,6 @@ export function HabitForm({
         image: values.image,
         positive_motivation: values.positive_motivation,
         negative_motivation: values.negative_motivation,
-        notes: values.notes?.trim() || null,
         habit_type: isSnow ? "snowball" : "standard",
         base_target: isSnow ? values.base_target : null,
         step_value: isSnow ? values.step_value : null,
@@ -419,14 +416,15 @@ export function HabitForm({
     },
   });
 
-  // "Increase earlier" for snowball habits: bump the target right away and
-  // restart the interval, then close the dialog (the habit prop would be stale).
-  const increaseNow = useMutation({
-    mutationFn: async () => increaseSnowballNow(habit!),
-    onSuccess: (newTarget) => {
+  // Manual snowball nudge (+step / −step) for when the automatic check is too
+  // slow; restarts the interval, then closes the dialog (the habit prop would
+  // be stale).
+  const adjustNow = useMutation({
+    mutationFn: async (dir: "up" | "down") => adjustSnowballNow(habit!, dir),
+    onSuccess: (newTarget, dir) => {
       queryClient.invalidateQueries({ queryKey: ["habits"] });
       toast({
-        title: "Target increased!",
+        title: dir === "up" ? "Target increased!" : "Target lowered",
         description: `New target: ${newTarget} ${habit?.unit || ""}`.trim(),
       });
       onSuccess();
@@ -436,7 +434,7 @@ export function HabitForm({
       console.error(error);
       toast({
         title: "Error!",
-        description: "Failed to increase the target.",
+        description: "Failed to change the target.",
         variant: "destructive",
       });
     },
@@ -576,16 +574,37 @@ export function HabitForm({
                 name="habit_type"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Habit Type</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <div className="flex items-center gap-1">
+                      <FormLabel>Habit Type</FormLabel>
+                      <InfoTip label="What is Classic vs Snowball?">
+                        <p><span className="font-semibold">Classic</span> — the target stays the same until you change it.</p>
+                        <p><span className="font-semibold">Snowball</span> — the target adapts to you. Tap the ⓘ next to the snowball settings to see how.</p>
+                      </InfoTip>
+                    </div>
+                    <HabitTypePicker value={field.value} onChange={field.onChange} />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="frequency"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Frequency</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value}
+                    >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select type" />
+                          <SelectValue placeholder="Select frequency" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="standard">Standard</SelectItem>
-                        <SelectItem value="snowball">Snowball (target grows over time)</SelectItem>
+                        <SelectItem value="daily">Daily</SelectItem>
+                        <SelectItem value="weekly">Weekly</SelectItem>
+                        <SelectItem value="monthly">Monthly</SelectItem>
                       </SelectContent>
                     </Select>
                   </FormItem>
@@ -677,13 +696,31 @@ export function HabitForm({
 
               {form.watch("habit_type") === "snowball" && (
                 <div className="space-y-3 border p-3 rounded-md">
+                  <div className="flex items-center gap-1 text-sm font-medium">
+                    Snowball settings
+                    <InfoTip label="How does Snowball work?">
+                      <p>
+                        The target starts at <span className="font-semibold">Start Target</span> and
+                        is re-checked every <span className="font-semibold">N days</span> (the interval).
+                      </p>
+                      <ul className="list-disc space-y-1 pl-4">
+                        <li>Hit the target on at least 80&nbsp;% of the days → the target goes <span className="font-semibold">up</span> by the step.</li>
+                        <li>Hit it on less than 50&nbsp;% of the days → it goes <span className="font-semibold">down</span> by the step, so the bar stays reachable.</li>
+                        <li>Anything in between → the target stays the same.</li>
+                      </ul>
+                      <p className="text-muted-foreground">
+                        Example: start 10 push-ups, step 2, every 14 days. A good two weeks → 12, a rough two weeks → 8.
+                        Days you don't log count as missed. Weekly habits are judged by the total amount.
+                      </p>
+                    </InfoTip>
+                  </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
                       name="step_value"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Increase By (step)</FormLabel>
+                          <FormLabel>Change By (step)</FormLabel>
                           <FormControl>
                             <NumberStepper
                               min={0}
@@ -699,7 +736,7 @@ export function HabitForm({
                       name="interval_days"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Every (days)</FormLabel>
+                          <FormLabel>Check every (days)</FormLabel>
                           <FormControl>
                             <NumberStepper
                               min={1}
@@ -711,10 +748,6 @@ export function HabitForm({
                       )}
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    The target starts at the start target and automatically grows by the
-                    step after each interval (e.g. every 21 days).
-                  </p>
                   {habit && habit.habit_type === "snowball" && (
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-sm">
@@ -723,96 +756,56 @@ export function HabitForm({
                           {habit.target_value} {habit.unit}
                         </span>
                       </span>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={increaseNow.isPending || !(habit.step_value && habit.step_value > 0)}
-                        onClick={() => increaseNow.mutate()}
-                      >
-                        {increaseNow.isPending ? (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : null}
-                        Increase now (+{habit.step_value ?? 0})
-                      </Button>
+                      <div className="flex gap-2">
+                        {(["down", "up"] as const).map((dir) => (
+                          <Button
+                            key={dir}
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={adjustNow.isPending || !(habit.step_value && habit.step_value > 0)}
+                            onClick={() => adjustNow.mutate(dir)}
+                          >
+                            {adjustNow.isPending && adjustNow.variables === dir ? (
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : null}
+                            {dir === "up" ? "+" : "−"}{habit.step_value ?? 0} now
+                          </Button>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
               )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="color"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Color</FormLabel>
-                      <div className="space-y-2">
-                        <div className="flex flex-wrap gap-2 mb-2">
-                          {colorPresets.map((color) => (
-                            <div
-                              key={color}
-                              onClick={() => field.onChange(color)}
-                              className={`w-8 h-8 rounded-full cursor-pointer border-2 ${
-                                field.value === color ? 'border-white shadow-lg' : 'border-transparent'
-                              } hover:scale-110 transition-transform`}
-                              style={{ backgroundColor: color }}
-                              title={color}
-                            />
-                          ))}
-                        </div>
-                        <FormControl>
-                          <Input
-                            type="color"
-                            {...field}
-                            className="h-10 w-full"
-                          />
-                        </FormControl>
-                      </div>
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="frequency"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Frequency</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select frequency" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="daily">Daily</SelectItem>
-                          <SelectItem value="weekly">Weekly</SelectItem>
-                          <SelectItem value="monthly">Monthly</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </FormItem>
-                  )}
-                />
-              </div>
-
               <FormField
                 control={form.control}
-                name="notes"
+                name="color"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Notes</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Optional notes about this habit (tips, rules, context...)"
-                        rows={3}
-                        {...field}
-                        value={field.value ?? ""}
-                      />
-                    </FormControl>
+                    <FormLabel>Color</FormLabel>
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        {colorPresets.map((color) => (
+                          <div
+                            key={color}
+                            onClick={() => field.onChange(color)}
+                            className={`w-8 h-8 rounded-full cursor-pointer border-2 ${
+                              field.value === color ? 'border-white shadow-lg' : 'border-transparent'
+                            } hover:scale-110 transition-transform`}
+                            style={{ backgroundColor: color }}
+                            title={color}
+                          />
+                        ))}
+                      </div>
+                      <FormControl>
+                        <Input
+                          type="color"
+                          {...field}
+                          className="h-10 w-full"
+                        />
+                      </FormControl>
+                    </div>
                   </FormItem>
                 )}
               />
@@ -826,6 +819,13 @@ export function HabitForm({
                     <Bell className="h-4 w-4" />
                     Reminder notification
                   </label>
+                  <InfoTip label="What does the reminder do?" className="mr-auto">
+                    <p>
+                      Every day at the chosen time your phone shows a notification with your
+                      dream's image and your positive &amp; negative motivation.
+                    </p>
+                    <p className="text-muted-foreground">Works in the Dream Tracker Android app.</p>
+                  </InfoTip>
                   <input
                     type="checkbox"
                     id="habit-notify"
@@ -888,10 +888,6 @@ export function HabitForm({
                     )}
                   />
                 )}
-                <p className="text-xs text-muted-foreground">
-                  Sends a push notification at the chosen time with your dream's
-                  image and your positive &amp; negative motivation.
-                </p>
               </div>
 
               <div className="space-y-4">

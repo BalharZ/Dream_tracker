@@ -396,6 +396,19 @@
 
 ---
 
+### S45 — Snowball klesá i roste + úprava formuláře zvyku (#9, #11)
+**Soubory:** `src/lib/snowball.ts`, `habit-form.tsx`, `habits-page.tsx`, nové `src/components/ui/info-tip.tsx`, `src/components/habits/habit-type-picker.tsx`
+✅ **Hotovo (2026-10-23)** — **BEZ SQL**:
+1. **Snowball se přizpůsobuje:** na konci každého intervalu (`interval_days`) se vyhodnotí uplynulé období z `habit_progress`: target splněn v ≥ 80 % dní → +step, v < 50 % dní → −step (minimum = 1 step), jinak beze změny. Nezalogovaný den = nesplněno. Týdenní zvyky se hodnotí podle součtu (součet / (target × dny/7)). Stále líně při načtení zvyků (`applySnowballGrowth`), kotva `last_increase_at` se posouvá o celé intervaly.
+2. **Ruční tlačítka** „−step now" / „+step now" (`adjustSnowballNow`) místo samotného „Increase now".
+3. **Pořadí ve formuláři:** Název → Typ zvyku → Frequency → Target + Unit → Snowball nastavení → Color → Reminder → Rewards.
+4. **Typ zvyku graficky:** dvě karty s ikonami — Classic (terč, „Fixed target") a Snowball (kutálející se sněhová koule, „Target adapts").
+5. **Vysvětlivky ⓘ** (popover na klik, funguje i na mobilu) u Habit Type, Snowball settings a Reminder notification; původní šedé texty odstraněny.
+6. **Notes odstraněny** z formuláře i ze zobrazení (ikona u zvyku, text v dialogu dne). Sloupec `notes` v DB zůstává; formulář ho už nepřepisuje.
+**Ověřeno:** `tsc --noEmit` bez chyb, `vite build` prošel, dev server bez chyb v konzoli. Formulář je za přihlášením, vizuálně neověřeno.
+
+---
+
 ## Backlog — audit seznamu úprav (2026-08-30)
 
 > Audit seznamu 19 úprav od majitele proti aktuálnímu kódu. Legenda: ✅ hotovo · ⚠️ bug/regrese (kód existuje, ale nefunguje jak má) · ❌ nezačato (nová funkce). Body rozkouskované do samostatných budoucích sessionů (S33+) tak, aby každá byla nezávislá a šetřila tokeny — po resetu stačí říct číslo/název sessionu.
@@ -411,9 +424,9 @@
 | 6 | Notifikace nestřílí v čase (appka i chrome); skáčou při připojení telefonu; duplicitní | ✅ hotovo (S33, 2026-08-30) | S33 |
 | 7 | Zvyk na mobilu utekl doleva za obrazovku | ✅ hotovo (S34, 2026-08-30) | S34 |
 | 8 | Moc notifikací (chrome + appka) — vypnout web push, jen appka | ✅ hotovo (S33, 2026-08-30) | S33 |
-| 9 | Snowball: jak funguje + má i klesat, když se nevyplní | ❌ (růst je, decay není) | S37 |
+| 9 | Snowball: jak funguje + má i klesat, když se nevyplní | ✅ hotovo (S45, 2026-10-23) | S45 |
 | 10 | Do tvorby odměn dostat obrázky (free databanka / google) | ❌ = duplicitní s #1 | S41 |
-| 11 | Odebrat poznámky (Notes) u nastavení zvyků | ❌ (pole `notes` stále v `habit-form.tsx`) | S40 |
+| 11 | Odebrat poznámky (Notes) u nastavení zvyků | ✅ hotovo (S45, 2026-10-23) | S45 |
 | 12 | Odebrat ikonu aktualizace („update" šipky) z hlavičky (je i v Nastavení) | ✅ hotovo (2026-08-30, commit) | — |
 | 13 | Sjednotit zobrazení obrázků (rewards+dreams): full šířka, výška auto | ❌ | S39 |
 | 14 | Widget refresh tlačítko nefunguje | ⚠️ (ACTION_REFRESH je zadrátován, ladit) | S42 |
