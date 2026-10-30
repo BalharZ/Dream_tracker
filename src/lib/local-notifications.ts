@@ -3,6 +3,7 @@ import { LocalNotifications } from "@capacitor/local-notifications";
 import { supabase } from "@/lib/supabase";
 import type { Habit } from "@shared/schema";
 import { frequencyLabel, habitFrequency } from "@/lib/frequency";
+import { computeStreak } from "@/lib/streaks";
 
 // Custom native plugin (android/app/.../reminders/HabitReminderPlugin.java).
 // It schedules exact self-repeating alarms and, at fire time, posts a
@@ -347,8 +348,61 @@ export async function syncHabitReminders(habits: Habit[]): Promise<void> {
       for (const habit of wantedHabits) {
         await scheduleOne(habit, contentMap.get(habit.id));
       }
+      await syncStreakSavers(habits);
     }
   } catch (err) {
     console.error("Syncing local notifications failed:", err);
   }
+}
+
+/* ---------------------------------------------------- S61: streak saver */
+
+// One-shot "don't lose your streak" reminder for tonight, per daily habit.
+// The native alarms repeat blindly (they can't check progress at fire time),
+// so the saver is laid down for *today only* each time habits sync — the
+// sync re-runs after every progress save, which cancels it once done.
+const STREAK_SAVER_HOUR = 21;
+const STREAK_SAVER_MIN_STREAK = 3;
+const streakSaverId = (habitId: number) => 9_000_000 + habitId;
+
+async function syncStreakSavers(habits: Habit[]): Promise<void> {
+  const daily = habits.filter((h) => !h.archived_at && habitFrequency(h).kind === "daily");
+  const all = habits.map((h) => ({ id: streakSaverId(h.id) }));
+  if (all.length) await LocalNotifications.cancel({ notifications: all });
+
+  const at = new Date();
+  at.setHours(STREAK_SAVER_HOUR, 0, 0, 0);
+  if (daily.length === 0 || at.getTime() <= Date.now()) return;
+
+  const since = new Date();
+  since.setDate(since.getDate() - 60);
+  const { data } = await supabase
+    .from("habit_progress")
+    .select("habit_id, date, value")
+    .in("habit_id", daily.map((h) => h.id))
+    .gte("date", since.toISOString().slice(0, 10));
+  const byHabit: Record<number, Record<string, number>> = {};
+  (data || []).forEach((p) => ((byHabit[p.habit_id] ||= {})[p.date] = p.value));
+
+  const notifications = [];
+  for (const h of daily) {
+    const values = byHabit[h.id] || {};
+    const target = h.target_value > 0 ? h.target_value : 1;
+    if ((values[localDayKey(new Date())] || 0) >= target) continue; // done today
+    const streak = computeStreak(h, values);
+    if (streak < STREAK_SAVER_MIN_STREAK) continue;
+    notifications.push({
+      id: streakSaverId(h.id),
+      title: `🔥 Don't lose your ${streak}-day streak`,
+      body: `${reminderTitle(h).replace(/^⏰ /, "")} — there's still time today.`,
+      iconColor: h.color,
+      schedule: { at, allowWhileIdle: true },
+    });
+  }
+  if (notifications.length) await LocalNotifications.schedule({ notifications });
+}
+
+function localDayKey(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
