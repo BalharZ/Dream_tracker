@@ -501,50 +501,34 @@ Detail viz `docs/NAMING.md` (sekce „Provedeno"). Viditelný název → Northst
 
 ### Fáze A — bez majitele
 
-- [ ] **S51 Archiv zvyků**
-  - SQL `supabase/sql/S51_habit_archive.sql`: sloupec `habits.archived_at timestamptz null`. **Ruční krok majitele:** spustit v Supabase.
-  - V dialogu úpravy zvyku tlačítko **Archive** vedle Delete. Delete se zeptá, jestli nechce raději archivovat.
-  - Archivované zvyky zmizí z tabulky, dashboardu, widgetu i notifikací.
-  - Na stránce Habits tlačítko **Archive (N)** → seznam archivovaných s **Restore** a **Delete forever**.
-  - Archivované zvyky se nepočítají do limitu 5 zvyků.
-- [ ] **S52 Dialog úpravy zvyku ujíždí za obrazovku**
-  - Tělo dialogu nesmí růst do šířky (`grid-cols-[minmax(0,1fr)]`, `overflow-x-hidden`). Spodní tlačítka se zalomí (`flex-wrap`).
-  - Ověřit na šířce 360 px.
-- [ ] **S53 Síla zvyku**
-  - `src/lib/habit-strength.ts` podle vzorce v MONETIZATION §3, včetně týdenních a měsíčních zvyků.
-  - V tabulce zvyků štítek síly místo medaile 21 dní. Ve Stats velké číslo + štítek + milníky (21 / 66 / 254 dní).
-- [ ] **S54 Notifikace: co a kolik udělat**
-  - Titulek „<název zvyku> — <cíl> <jednotka>“ (např. „Exercise — 1 h“). U týdenních „(2/3 this week)“.
-  - Pozitivní/negativní motivace a obrázek zůstávají v textu.
-- [ ] **S55 Týdenní zvyky N× týdně**
-  - Ve formuláři frekvence Daily / „Times per week“ + stepper 1–6 / Monthly. Ukládá se jako `"3x per week"`.
-  - Tabulka: splněný den v nedokončeném týdnu 50 % barvy, po splnění týdne 100 % zpětně.
-  - Po splnění N v týdnu hláška „Week complete!“. Denní ruleta běží dál.
-- [ ] **S56 Týdenní odměny**
-  - U týdenního zvyku v dialogu tlačítko „Add weekly reward“ (klíč `"w<habitId>"` v `rewards.habit_chances`).
-  - Po splnění týdne se spustí ruleta s týdenními odměnami. Bez týdenní odměny nabídne její přidání.
-- [ ] **S57 Free/Pro základ**
-  - Hook `usePlan()` vrací `free | pro | pro_ai`. Zdroj zatím testovací přepínač v Nastavení (localStorage), později tabulka `entitlements`.
-  - Limity 3 sny / 5 zvyků (archivované se nepočítají). Při překročení se ukáže paywall dialog.
-  - Paywall dialog: tři plány z MONETIZATION §2, tlačítka zatím „Coming soon“. Otevírá se v kontextu (4. sen, 6. zvyk, Stats, Export, AI, historie).
-- [ ] **S58 Stats paywall**
-  - Free: Síla zvyku + série. Zbytek grafů jsou skutečná data rozmazaná, se zámkem, větou o hodnotě a teasery (weakest day, best streak).
-  - Tabulka zvyků ve Free max. 3 měsíce historie, „Load more“ dál otevře paywall.
-- [ ] **S59 Export dat**
-  - Nastavení → Your data → Export: JSON se všemi tabulkami uživatele (zdarma).
-  - Zašedlé Pro volby Excel / PDF report / Auto backup / Restore from backup.
-- [ ] **S60 Chat s tutoriálem (bez AI)**
-  - Plovoucí ikona chatu (skrýt / minimalizovat, stav v localStorage).
-  - Scénář: první sen → cíl → zvyk → odměna, tlačítka místo psaní, uloží přes stávající API.
-  - FAQ odpovědi (zvyky, sny, odměny, síla zvyku). Karta „AI Coach (Pro + AI)“ s místem pro video ukázku.
-- [ ] **S61 Chytré připomínky**
-  - Záchrana série ve 21:00 (Free): jen když zvyk není splněný a série je aspoň 3 dny.
-  - Pro: víc připomínek denně, adaptivní čas, nedělní souhrn.
-- [ ] **S62 Právní texty (návrh)**
-  - `public/privacy.html` + `public/terms.html` v angličtině: GDPR, export, AI a fotky, předplatné, vracení peněz podle Google Play, žádné vrácení po využití AI.
-  - **Majitel doplní:** firmu / IČO / adresu / kontakt.
-- [ ] **S63 Příprava ochrany proti klonování**
-  - Pro výpočty a limity připravit tak, aby šly přesunout na server. Obfuskace buildu.
+> **Stav 2026-10-30:** S51–S62 udělané na větvi `northstar-pro-prep` (commit na session, **nepushnuto, nenasazeno**).
+> Ověřeno: `tsc` bez chyb, `vite build` prošel, aplikace naběhne bez chyb v konzoli.
+> **Neověřeno v přihlášené aplikaci** (Claude se nepřihlašuje do produkční DB). Majitel projde checklist níž.
+>
+> **Ruční kroky majitele před nasazením:**
+> 1. Spustit `supabase/sql/S51_habit_archive.sql` v Supabase SQL editoru (sloupec `archived_at` + widget bez archivovaných).
+> 2. Projít aplikaci lokálně (`npm run dev`), pak větev mergnout do `main` a pushnout (Vercel nasadí, appka se načte živě).
+> 3. Pozor: po nasazení jsou všichni na **Free** (limit 3 sny / 5 zvyků pro *nové* položky). Pro test přepni plán v Nastavení → Plan → Test mode.
+
+- [x] **S51 Archiv zvyků** ✅ 2026-10-30 — tlačítko Archive v dialogu zvyku, Delete radí archivovat, na stránce Habits „Archive (N)“ s Restore / Delete forever. Archivované zmizí z tabulky, dashboardu, notifikací a (po SQL) z widgetu.
+  *Ověř:* archivuj zvyk → zmizí, v Archive ho obnov → vrátí se i s historií.
+- [x] **S52 Dialogy neujíždí do šířky** ✅ 2026-10-30 — v `dialog.tsx` má tělo dialogu sloupec `minmax(0,1fr)` a `overflow-x-hidden`, padding na mobilu 16 px, tlačítka ve formuláři zvyku se zalamují.
+  *Ověř:* úprava zvyku na telefonu nesmí jít posunout do boku. Pokud ujíždí ještě něco jiného (např. při klávesnici), popiš kde.
+- [x] **S53 Síla zvyku** ✅ 2026-10-30 — `src/lib/habit-strength.ts` (vzorec MONETIZATION §3, otestovaný), štítek 💪 % v tabulce místo medaile 21 dní, karta s prstencem, úrovní a milníky ve Stats, % v přehledu Stats.
+- [x] **S54 Notifikace: co a kolik** ✅ 2026-10-30 — titulek „⏰ Exercise — 1 h · 3× / week“ (nativní i záložní cesta). Bez nového APK, appka načítá web živě.
+- [x] **S55 Týdenní zvyky N× týdně** ✅ 2026-10-30 — frekvence „Times per week“ + stepper 1–6 (`"3x per week"`), v tabulce splněný den 50 % barvy, po splnění týdne 100 % zpětně, hláška „Week complete!“. Snowball počítá N× týdně správně.
+  *Zbývá:* dashboard zatím neukazuje stav týdne (jen tabulka Habits).
+- [x] **S56 Týdenní odměny** ✅ 2026-10-30 — tlačítko „Weekly rewards“ u týdenního zvyku (editor šancí, klíč `w<id>`), po splnění týdne týdenní ruleta (po denní). Bez týdenních odměn hláška nabídne „Add weekly reward“.
+- [x] **S57 Free/Pro základ** ✅ 2026-10-30 — `usePlan()` + testovací přepínač v Nastavení, limity 3 sny / 5 aktivních zvyků, paywall dialog podle kontextu (tlačítka „Coming soon“).
+- [x] **S58 Stats paywall** ✅ 2026-10-30 — Free vidí sílu zvyku a aktuální sérii, zbytek jsou rozmazaná skutečná data se zámkem a teasery (weakest day, best streak). Historie v tabulce max. 90 dní.
+- [x] **S59 Export dat** ✅ 2026-10-30 — Nastavení → Your data → Export (JSON, zdarma; na Androidu přes sdílení). Zašedlé Pro volby Excel / PDF / Auto backup / Restore.
+- [x] **S60 Chat s tutoriálem** ✅ 2026-10-30 — plovoucí ikona (minimalizovat / skrýt do proužku u okraje), průvodce sen → cíl → zvyk → odměna (hlídá Free limity), FAQ, ukázka AI kouče.
+  *Majitel:* nahraj video ukázku jako `public/coach-demo.mp4`.
+- [x] **S61 Záchrana série** ✅ 2026-10-30 (část Free) — ve 21:00 jen pro nesplněný denní zvyk se sérií 3+ dny. Plánuje se na „dnes“ při každém otevření appky a po splnění se zruší.
+- [ ] **S61b Chytré připomínky Pro** — víc připomínek denně, adaptivní čas, nedělní souhrn. Pozn.: kontrola splnění v okamžiku zazvonění vyžaduje úpravu nativního pluginu → nové APK.
+- [x] **S62 Právní texty** ✅ 2026-10-30 — `public/privacy.html`, `public/terms.html`, odkazy v Nastavení.
+  *Majitel:* doplnit žlutá pole [TODO] (firma, IČO, adresa, e-mail, region Supabase) a nechat zkontrolovat.
+- [ ] **S63 Ochrana proti klonování** — odloženo do S64/S66: má smysl, až budou AI a platby na serveru (Edge Functions + RLS). Pak doplnit obfuskaci buildu a Play Integrity.
 
 ### Fáze B — potřebuje majitele
 
