@@ -490,3 +490,68 @@ Detail viz `docs/NAMING.md` (sekce „Provedeno"). Viditelný název → Northst
 - S14 staví na S5 (progres). S13 staví na S12 (snowball/podcviky). S16 a S17 jsou největší a vyžadují infra rozhodnutí (PWA web push vs. nativní Capacitor).
 - Pořadí S1–S8 je doporučené (rychlé, vysoký dopad, bez DB), ale sessiony jsou víceméně nezávislé — pořadí lze měnit.
 - Backlog S33+ (audit 2026-08-30): P1 bugy dřív než P2/P3. S33 (notifikace) a S37 (snowball) jsou největší v P1; S43 (týdenní frekvence) je největší celkově.
+
+---
+
+## Monetizace a vyladění (S51–S70)
+
+> Rozhodnutí, ceny, náklady a vzorce: `docs/MONETIZATION.md`. Každá session = jeden commit.
+> **Fáze A** (S51–S63) jde udělat bez majitele. **Fáze B** (S64–S70) potřebuje klíče, účty nebo rozhodnutí majitele.
+> Pro stav se ve fázi A přepíná testovacím přepínačem v Nastavení (není to platba).
+
+### Fáze A — bez majitele
+
+- [ ] **S51 Archiv zvyků**
+  - SQL `supabase/sql/S51_habit_archive.sql`: sloupec `habits.archived_at timestamptz null`. **Ruční krok majitele:** spustit v Supabase.
+  - V dialogu úpravy zvyku tlačítko **Archive** vedle Delete. Delete se zeptá, jestli nechce raději archivovat.
+  - Archivované zvyky zmizí z tabulky, dashboardu, widgetu i notifikací.
+  - Na stránce Habits tlačítko **Archive (N)** → seznam archivovaných s **Restore** a **Delete forever**.
+  - Archivované zvyky se nepočítají do limitu 5 zvyků.
+- [ ] **S52 Dialog úpravy zvyku ujíždí za obrazovku**
+  - Tělo dialogu nesmí růst do šířky (`grid-cols-[minmax(0,1fr)]`, `overflow-x-hidden`). Spodní tlačítka se zalomí (`flex-wrap`).
+  - Ověřit na šířce 360 px.
+- [ ] **S53 Síla zvyku**
+  - `src/lib/habit-strength.ts` podle vzorce v MONETIZATION §3, včetně týdenních a měsíčních zvyků.
+  - V tabulce zvyků štítek síly místo medaile 21 dní. Ve Stats velké číslo + štítek + milníky (21 / 66 / 254 dní).
+- [ ] **S54 Notifikace: co a kolik udělat**
+  - Titulek „<název zvyku> — <cíl> <jednotka>“ (např. „Exercise — 1 h“). U týdenních „(2/3 this week)“.
+  - Pozitivní/negativní motivace a obrázek zůstávají v textu.
+- [ ] **S55 Týdenní zvyky N× týdně**
+  - Ve formuláři frekvence Daily / „Times per week“ + stepper 1–6 / Monthly. Ukládá se jako `"3x per week"`.
+  - Tabulka: splněný den v nedokončeném týdnu 50 % barvy, po splnění týdne 100 % zpětně.
+  - Po splnění N v týdnu hláška „Week complete!“. Denní ruleta běží dál.
+- [ ] **S56 Týdenní odměny**
+  - U týdenního zvyku v dialogu tlačítko „Add weekly reward“ (klíč `"w<habitId>"` v `rewards.habit_chances`).
+  - Po splnění týdne se spustí ruleta s týdenními odměnami. Bez týdenní odměny nabídne její přidání.
+- [ ] **S57 Free/Pro základ**
+  - Hook `usePlan()` vrací `free | pro | pro_ai`. Zdroj zatím testovací přepínač v Nastavení (localStorage), později tabulka `entitlements`.
+  - Limity 3 sny / 5 zvyků (archivované se nepočítají). Při překročení se ukáže paywall dialog.
+  - Paywall dialog: tři plány z MONETIZATION §2, tlačítka zatím „Coming soon“. Otevírá se v kontextu (4. sen, 6. zvyk, Stats, Export, AI, historie).
+- [ ] **S58 Stats paywall**
+  - Free: Síla zvyku + série. Zbytek grafů jsou skutečná data rozmazaná, se zámkem, větou o hodnotě a teasery (weakest day, best streak).
+  - Tabulka zvyků ve Free max. 3 měsíce historie, „Load more“ dál otevře paywall.
+- [ ] **S59 Export dat**
+  - Nastavení → Your data → Export: JSON se všemi tabulkami uživatele (zdarma).
+  - Zašedlé Pro volby Excel / PDF report / Auto backup / Restore from backup.
+- [ ] **S60 Chat s tutoriálem (bez AI)**
+  - Plovoucí ikona chatu (skrýt / minimalizovat, stav v localStorage).
+  - Scénář: první sen → cíl → zvyk → odměna, tlačítka místo psaní, uloží přes stávající API.
+  - FAQ odpovědi (zvyky, sny, odměny, síla zvyku). Karta „AI Coach (Pro + AI)“ s místem pro video ukázku.
+- [ ] **S61 Chytré připomínky**
+  - Záchrana série ve 21:00 (Free): jen když zvyk není splněný a série je aspoň 3 dny.
+  - Pro: víc připomínek denně, adaptivní čas, nedělní souhrn.
+- [ ] **S62 Právní texty (návrh)**
+  - `public/privacy.html` + `public/terms.html` v angličtině: GDPR, export, AI a fotky, předplatné, vracení peněz podle Google Play, žádné vrácení po využití AI.
+  - **Majitel doplní:** firmu / IČO / adresu / kontakt.
+- [ ] **S63 Příprava ochrany proti klonování**
+  - Pro výpočty a limity připravit tak, aby šly přesunout na server. Obfuskace buildu.
+
+### Fáze B — potřebuje majitele
+
+- [ ] **S64 AI kouč** — majitel dodá Claude API klíč. Edge Function `ai-coach`, nástroje, limity, logování spotřeby, napojení na chat z S60.
+- [ ] **S65 AI obrázky** — klíče Google AI Studio + OpenAI. Edge Function, limit 20/měs., tlačítko Nahlásit.
+- [ ] **S66 Platby** — Play Console produkty + RevenueCat účet. Tabulka `entitlements` + webhook, Restore Purchases, nahradit testovací přepínač.
+- [ ] **S67 Referral** — share link, sleva po uplynutí lhůty pro vrácení (Play offer codes).
+- [ ] **S68 Commitment Credits (pokuty)** — po rozhodnutí majitele a konzultaci s účetní (MONETIZATION §11).
+- [ ] **S69 Checklist před spuštěním** — projít MONETIZATION §13.
+- [ ] **S70 Bezpečnostní audit** — podle videa a instruktáže majitele.
