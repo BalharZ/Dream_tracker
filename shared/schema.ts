@@ -147,4 +147,6 @@ export type WidgetToken = {
 // quantity 1) or an object with the chance and how many pieces of the reward
 // a single win grants (e.g. 5× "1 h of gaming" for a harder habit).
 export type ChanceEntry = number | { chance: number; quantity?: number };
-export type HabitChances = { [habitId: number]: ChanceEntry };
+// Keys are habit ids for the daily (per-completion) roulette, or "w<habitId>"
+// for the weekly roulette of N× per week habits (S56).
+export type HabitChances = { [key: string]: ChanceEntry };

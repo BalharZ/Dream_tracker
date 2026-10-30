@@ -19,6 +19,9 @@ import { applySnowballGrowth } from "@/lib/snowball";
 import { computeStreak } from "@/lib/streaks";
 import { frequencyLabel, habitFrequency, weekDoneCount } from "@/lib/frequency";
 import { StrengthChip } from "@/components/habits/habit-strength";
+import { WeeklyRewardsDialog } from "@/components/habits/weekly-rewards-dialog";
+import { ToastAction } from "@/components/ui/toast";
+import { parseHabitChances, weeklyChanceKey } from "@/lib/habit-chances";
 import { syncHabitReminders } from "@/lib/local-notifications";
 
 type ProgressMap = Record<number, Record<string, number>>;
@@ -88,6 +91,11 @@ function HabitsPage() {
   const [numberOfDays, setNumberOfDays] = useState(30);
   const [statsOpen, setStatsOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
+  // S56: weekly roulette (shown right away, or queued behind the daily one)
+  // and the weekly-rewards editor.
+  const [weeklyRouletteHabit, setWeeklyRouletteHabit] = useState<Habit | null>(null);
+  const [pendingWeeklyHabit, setPendingWeeklyHabit] = useState<Habit | null>(null);
+  const [weeklyEditorHabit, setWeeklyEditorHabit] = useState<Habit | null>(null);
   const { toast } = useToast();
 
   const daysToShow = Array.from({ length: numberOfDays }, (_, i) => {
@@ -195,20 +203,34 @@ function HabitsPage() {
       clearTimeout(lastUpdate.timeout);
     }
 
-    // S55: celebrate the moment a N× per week habit reaches its weekly quota.
+    // S55/S56: the moment a N× per week habit reaches its weekly quota —
+    // celebrate, and spin the weekly roulette (after the daily one) or offer
+    // to set weekly rewards up.
     const freq = habitFrequency(habit);
+    let weekJustCompleted = false;
     if (freq.kind === "weekly") {
       const values = progressMap[habitId] || {};
       const day = new Date(date + "T00:00:00");
       const before = weekDoneCount(habit, values, day);
       const after = weekDoneCount(habit, values, day, { date, value });
-      if (before < freq.times && after >= freq.times) {
-        toast({
-          title: "Week complete! 🎉",
-          description: `${habit.name}: ${freq.times}× this week — the whole week is filled in.`,
-        });
-      }
+      weekJustCompleted = before < freq.times && after >= freq.times;
     }
+    const weeklyRewards = (rewards || []).filter(
+      (r) => parseHabitChances(r.habit_chances)[weeklyChanceKey(habitId)] !== undefined,
+    );
+    if (weekJustCompleted) {
+      toast({
+        title: "Week complete! 🎉",
+        description: `${habit.name}: ${freq.kind === "weekly" ? freq.times : 1}× this week — the whole week is filled in.`,
+        action:
+          weeklyRewards.length === 0 ? (
+            <ToastAction altText="Add a weekly reward" onClick={() => setWeeklyEditorHabit(habit)}>
+              Add weekly reward
+            </ToastAction>
+          ) : undefined,
+      });
+    }
+    const spinWeekly = weekJustCompleted && weeklyRewards.length > 0;
 
     updateProgress.mutate({ habitId, value, date });
 
@@ -231,8 +253,12 @@ function HabitsPage() {
         if (habitRewards.length > 0) {
           setSelectedHabitForReward(habit);
           setShowRewardRoulette(true);
+          // The weekly roulette follows once the daily one is closed.
+          if (spinWeekly) setPendingWeeklyHabit(habit);
+          return;
         }
       }
+      if (spinWeekly) setWeeklyRouletteHabit(habit);
     }, 800);
 
     setLastUpdate({ habitId, value, date, timeout });
@@ -285,6 +311,7 @@ function HabitsPage() {
           onClose={() => setHabitToEdit(null)}
           onDelete={habitToEdit ? () => deleteHabit.mutate(habitToEdit.id) : undefined}
           onArchive={habitToEdit ? () => setArchived.mutate({ habitId: habitToEdit.id, archived: true }) : undefined}
+          onWeeklyRewards={habitToEdit ? () => setWeeklyEditorHabit(habitToEdit) : undefined}
         />
       </div>
 
@@ -488,8 +515,31 @@ function HabitsPage() {
           onClose={() => {
             setShowRewardRoulette(false);
             setSelectedHabitForReward(null);
+            if (pendingWeeklyHabit) {
+              setWeeklyRouletteHabit(pendingWeeklyHabit);
+              setPendingWeeklyHabit(null);
+            }
           }}
           habit={selectedHabitForReward}
+          rewards={rewards || []}
+        />
+      )}
+
+      {weeklyRouletteHabit && (
+        <RewardRoulette
+          show
+          onClose={() => setWeeklyRouletteHabit(null)}
+          habit={weeklyRouletteHabit}
+          rewards={rewards || []}
+          chanceKey={weeklyChanceKey(weeklyRouletteHabit.id)}
+        />
+      )}
+
+      {weeklyEditorHabit && (
+        <WeeklyRewardsDialog
+          open
+          onOpenChange={(open) => !open && setWeeklyEditorHabit(null)}
+          habit={weeklyEditorHabit}
           rewards={rewards || []}
         />
       )}

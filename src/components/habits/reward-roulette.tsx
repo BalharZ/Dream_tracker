@@ -18,12 +18,17 @@ export function RewardRoulette({
   onClose,
   habit,
   rewards,
+  chanceKey,
 }: {
   show: boolean;
   onClose: () => void;
   habit: Habit;
   rewards: Reward[];
+  // Which entry of habit_chances to roll on: the habit id (daily, default)
+  // or weeklyChanceKey(habit.id) for the weekly roulette (S56).
+  chanceKey?: string | number;
 }) {
+  const key = chanceKey ?? habit.id;
   const [selectedReward, setSelectedReward] = useState<Reward | null>(null);
   const [animationPhase, setAnimationPhase] = useState<'initial' | 'spinning' | 'finished'>('initial');
   const [isAnimating, setIsAnimating] = useState(false);
@@ -73,14 +78,14 @@ export function RewardRoulette({
       } as Reward;
 
       const habitRewards = rewards.filter(
-        r => parseHabitChances(r.habit_chances)[habit.id] !== undefined
+        r => parseHabitChances(r.habit_chances)[key] !== undefined
       );
 
       let totalChance = 0;
       const rewardChances: Record<number, number> = {};
 
       habitRewards.forEach(reward => {
-        const chance = getChance(parseHabitChances(reward.habit_chances)[habit.id]);
+        const chance = getChance(parseHabitChances(reward.habit_chances)[key]);
         rewardChances[reward.id] = chance;
         totalChance += chance;
       });
@@ -141,7 +146,7 @@ export function RewardRoulette({
             rewardClaimedRef.current = true;
             // A harder habit can grant several pieces of the same reward at once.
             const wonQuantity = getQuantity(
-              parseHabitChances(chosenReward.habit_chances)[habit.id]
+              parseHabitChances(chosenReward.habit_chances)[key]
             );
             supabase
               .from("rewards")
@@ -162,7 +167,7 @@ export function RewardRoulette({
       setIsFinished(false);
       setAnimationPhase('initial');
     }
-  }, [show, habit.id]);
+  }, [show, habit.id, key]);
 
   const getRewardStyles = () => {
     if (animationPhase === 'initial') {
@@ -220,7 +225,7 @@ export function RewardRoulette({
                 {rewardCards.map((card, index) => {
                   const isWinningCard = index === 50;
                   const cardQuantity =
-                    card.id > 0 ? getQuantity(parseHabitChances(card.habit_chances)[habit.id]) : 1;
+                    card.id > 0 ? getQuantity(parseHabitChances(card.habit_chances)[key]) : 1;
 
                   return (
                     <div
@@ -230,7 +235,7 @@ export function RewardRoulette({
                         ${card.id === 0
                           ? 'bg-gray-800/80 border-2 border-gray-600'
                           : (() => {
-                              const chance = getChance(parseHabitChances(card.habit_chances)[habit.id]);
+                              const chance = getChance(parseHabitChances(card.habit_chances)[key]);
                               if (chance < 10) return 'bg-amber-900/80 border-2 border-amber-600';
                               if (chance < 20) return 'bg-red-900/80 border-2 border-red-600';
                               if (chance < 30) return 'bg-purple-900/80 border-2 border-purple-600';
@@ -305,7 +310,7 @@ export function RewardRoulette({
                       <p className="text-green-400 font-medium text-lg">
                         {(() => {
                           const q = getQuantity(
-                            parseHabitChances(selectedReward.habit_chances)[habit.id]
+                            parseHabitChances(selectedReward.habit_chances)[key]
                           );
                           return (
                             <>

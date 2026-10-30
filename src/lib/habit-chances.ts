@@ -35,3 +35,6 @@ export function makeChanceEntry(chance: number, quantity: number): ChanceEntry {
   const q = Math.round(Number(quantity));
   return Number.isFinite(q) && q > 1 ? { chance, quantity: q } : chance;
 }
+
+/** S56: key of a habit's weekly-reward chances in `rewards.habit_chances`. */
+export const weeklyChanceKey = (habitId: number) => `w${habitId}`;

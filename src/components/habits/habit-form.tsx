@@ -55,6 +55,7 @@ export function HabitForm({
   onSuccess,
   onDelete,
   onArchive,
+  onWeeklyRewards,
   onClose,
 }: {
   goals: Goal[];
@@ -64,6 +65,8 @@ export function HabitForm({
   onDelete?: () => void;
   // S51: hide the habit but keep its history (restorable from the archive).
   onArchive?: () => void;
+  // S56: open the weekly-rewards editor (only for saved N× per week habits).
+  onWeeklyRewards?: () => void;
   // Called whenever the dialog closes without saving, so the parent can clear
   // its "editing" state (otherwise the Add Habit button stays stuck on "Edit").
   onClose?: () => void;
@@ -634,6 +637,12 @@ export function HabitForm({
                             aria-label="Times per week"
                           />
                           <span className="text-sm text-muted-foreground">× per week, each time the target below</span>
+                          {habit && onWeeklyRewards && (
+                            <Button type="button" variant="outline" size="sm" onClick={onWeeklyRewards}>
+                              <Gift className="mr-1 h-4 w-4" />
+                              Weekly rewards
+                            </Button>
+                          )}
                         </div>
                       )}
                     </FormItem>
