@@ -211,6 +211,12 @@ export default function SettingsPage() {
           )}
         </CardContent>
       </Card>
+
+      <p className="text-center text-xs text-muted-foreground">
+        <a href="/privacy.html" target="_blank" rel="noreferrer" className="underline">Privacy Policy</a>
+        {" · "}
+        <a href="/terms.html" target="_blank" rel="noreferrer" className="underline">Terms of Use</a>
+      </p>
     </div>
   );
 }
