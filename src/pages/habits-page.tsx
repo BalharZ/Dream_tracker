@@ -7,7 +7,7 @@ import { Habit, Goal, Reward, isActiveHabit } from "@shared/schema";
 import { supabase } from "@/lib/supabase";
 import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
-import { Archive, ArchiveRestore, BarChart3, ChevronRight, Flame, Medal, Trash2, TrendingUp } from "lucide-react";
+import { Archive, ArchiveRestore, BarChart3, ChevronRight, Flame, Trash2, TrendingUp } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { HabitForm } from "@/components/habits/habit-form";
@@ -16,7 +16,9 @@ import { RewardRoulette } from "@/components/habits/reward-roulette";
 import { HabitStatsDialog } from "@/components/habits/habit-stats";
 import { recomputeProgress } from "@/lib/progress";
 import { applySnowballGrowth } from "@/lib/snowball";
-import { computeStreak, isConsolidated, CONSOLIDATION_DAYS } from "@/lib/streaks";
+import { computeStreak } from "@/lib/streaks";
+import { habitFrequency } from "@/lib/frequency";
+import { StrengthChip } from "@/components/habits/habit-strength";
 import { syncHabitReminders } from "@/lib/local-notifications";
 
 type ProgressMap = Record<number, Record<string, number>>;
@@ -318,18 +320,10 @@ function HabitsPage() {
                           </div>
                         )}
                       </Button>
-                      {isConsolidated(streak) ? (
+                      <StrengthChip habit={habit} values={progressMap[habit.id] || {}} />
+                      {habitFrequency(habit).kind === "daily" && streak > 0 ? (
                         <span
-                          title={`Habit consolidated — ${streak} days in a row (${CONSOLIDATION_DAYS}+ needed)`}
-                          aria-label="Habit consolidated"
-                          className="flex-shrink-0 flex items-center gap-0.5 text-amber-500"
-                        >
-                          <Medal className="h-3.5 w-3.5" />
-                          <span className="text-[10px] font-semibold leading-none">{streak}</span>
-                        </span>
-                      ) : streak > 0 ? (
-                        <span
-                          title={`Streak: ${streak} day${streak === 1 ? "" : "s"} in a row — consolidated at ${CONSOLIDATION_DAYS}`}
+                          title={`Streak: ${streak} day${streak === 1 ? "" : "s"} in a row`}
                           aria-label={`Streak ${streak} days`}
                           className="flex-shrink-0 flex items-center gap-0.5 text-orange-500"
                         >

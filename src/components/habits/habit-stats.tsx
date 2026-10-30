@@ -16,7 +16,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { ArrowDownRight, ArrowLeft, ArrowRight, ArrowUpRight, BarChart3, Flame, Loader2, Trophy } from "lucide-react";
+import { ArrowDownRight, ArrowLeft, ArrowRight, ArrowUpRight, BarChart3, Dumbbell, Flame, Loader2, Trophy } from "lucide-react";
 import type { Habit } from "@shared/schema";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -34,6 +34,8 @@ import {
   yearGrid,
   type DayState,
 } from "@/lib/habit-stats";
+import { habitStrength } from "@/lib/habit-strength";
+import { StrengthCard } from "@/components/habits/habit-strength";
 
 type ProgressByHabit = Record<number, ValuesByDate>;
 
@@ -160,6 +162,7 @@ function Overview({ habits, progress, onSelect }: {
           streak: computeStreak(h, v),
           best: streakRuns(h, v)[0]?.length || 0,
           last28: yearGrid(h, v).flat().filter((c) => c.date <= new Date()).slice(-28),
+          strength: habitStrength(h, v),
         };
       }),
     [habits, progress],
@@ -195,7 +198,7 @@ function Overview({ habits, progress, onSelect }: {
       <p className="text-xs text-muted-foreground">Tap a habit for the full breakdown.</p>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        {rows.map(({ habit, month, streak, best, last28 }) => (
+        {rows.map(({ habit, month, streak, best, last28, strength }) => (
           <button
             key={habit.id}
             type="button"
@@ -211,6 +214,9 @@ function Overview({ habits, progress, onSelect }: {
                   <ArrowRight className="ml-auto h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
                 </div>
                 <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                  <span className="inline-flex items-center gap-0.5 font-semibold" style={{ color: habit.color }} title="Habit strength">
+                    <Dumbbell className="h-3 w-3" />{Math.round(strength * 100)}%
+                  </span>
                   <span className="inline-flex items-center gap-0.5"><Flame className="h-3 w-3 text-orange-500" />{streak}</span>
                   <span className="inline-flex items-center gap-0.5"><Trophy className="h-3 w-3 text-amber-500" />{best}</span>
                   <TrendBadge now={month.now} before={month.before} />
@@ -313,6 +319,8 @@ function HabitDetail({ habit, values }: { habit: Habit; values: ValuesByDate }) 
 
   return (
     <div className="space-y-4">
+      <StrengthCard habit={habit} values={values} />
+
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Kpi icon={<Flame className="h-4 w-4 text-orange-500" />} value={current} label="Current streak" />
         <Kpi icon={<Trophy className="h-4 w-4 text-amber-500" />} value={best} label="Best streak" />

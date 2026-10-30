@@ -2,11 +2,10 @@ import { format } from "date-fns";
 import type { Habit } from "@shared/schema";
 
 /**
- * Habit consolidation ("upevnění zvyku"): a habit counts as consolidated
- * after meeting its target CONSOLIDATION_DAYS days in a row. Computed purely
- * from habit_progress rows — no DB changes needed.
+ * Daily streaks, computed purely from habit_progress rows. (The old binary
+ * "consolidated after 21 days" badge was replaced by habit strength, S53 —
+ * see src/lib/habit-strength.ts.)
  */
-export const CONSOLIDATION_DAYS = 21;
 
 /** Day's values for one habit keyed by "yyyy-MM-dd". */
 export type ValuesByDate = Record<string, number>;
@@ -39,8 +38,4 @@ export function computeStreak(
     d.setDate(d.getDate() - 1);
   }
   return streak;
-}
-
-export function isConsolidated(streak: number): boolean {
-  return streak >= CONSOLIDATION_DAYS;
 }
