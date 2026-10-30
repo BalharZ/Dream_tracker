@@ -17,7 +17,7 @@ import { HabitStatsDialog } from "@/components/habits/habit-stats";
 import { recomputeProgress } from "@/lib/progress";
 import { applySnowballGrowth } from "@/lib/snowball";
 import { computeStreak } from "@/lib/streaks";
-import { habitFrequency } from "@/lib/frequency";
+import { frequencyLabel, habitFrequency, weekDoneCount } from "@/lib/frequency";
 import { StrengthChip } from "@/components/habits/habit-strength";
 import { syncHabitReminders } from "@/lib/local-notifications";
 
@@ -195,6 +195,21 @@ function HabitsPage() {
       clearTimeout(lastUpdate.timeout);
     }
 
+    // S55: celebrate the moment a N× per week habit reaches its weekly quota.
+    const freq = habitFrequency(habit);
+    if (freq.kind === "weekly") {
+      const values = progressMap[habitId] || {};
+      const day = new Date(date + "T00:00:00");
+      const before = weekDoneCount(habit, values, day);
+      const after = weekDoneCount(habit, values, day, { date, value });
+      if (before < freq.times && after >= freq.times) {
+        toast({
+          title: "Week complete! 🎉",
+          description: `${habit.name}: ${freq.times}× this week — the whole week is filled in.`,
+        });
+      }
+    }
+
     updateProgress.mutate({ habitId, value, date });
 
     // The dialog passes the habit's target as the win threshold; for
@@ -351,6 +366,9 @@ function HabitsPage() {
                         )}
                       </span>
                       <span className="text-[10px] leading-tight">{habit.unit}</span>
+                      {habitFrequency(habit).kind !== "daily" && (
+                        <span className="text-[9px] leading-tight opacity-80">{frequencyLabel(habitFrequency(habit))}</span>
+                      )}
                     </div>
                   </div>
                 );
@@ -378,6 +396,13 @@ function HabitsPage() {
                       const dateStr = format(date, "yyyy-MM-dd");
                       const value = progressMap[habit.id]?.[dateStr] || 0;
                       const isTargetMet = value >= habit.target_value;
+                      // S55: N× per week — a done day is half-coloured until
+                      // the week's quota is met, then the whole week turns full.
+                      const freq = habitFrequency(habit);
+                      const weekPending =
+                        freq.kind === "weekly" &&
+                        isTargetMet &&
+                        weekDoneCount(habit, progressMap[habit.id] || {}, date) < freq.times;
 
                       return (
                         <div
@@ -389,10 +414,19 @@ function HabitsPage() {
                             setEditProgressDialogOpen(true);
                           }}
                         >
-                          <div className="flex flex-col items-center">
+                          <div
+                            className="flex flex-col items-center rounded-md py-0.5"
+                            style={
+                              isTargetMet && value > 0
+                                ? { backgroundColor: `${habit.color}${weekPending ? "1a" : "33"}` }
+                                : undefined
+                            }
+                            title={weekPending ? "Done — finish the week to fill it in" : undefined}
+                          >
                             <div
                               className="text-base font-medium"
                               style={{
+                                opacity: weekPending ? 0.5 : 1,
                                 color: value === 0
                                   ? "#9CA3AF"
                                   : isTargetMet

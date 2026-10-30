@@ -18,6 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NumberStepper } from "@/components/ui/number-stepper";
+import { formatFrequency, MAX_TIMES_PER_WEEK, parseFrequency } from "@/lib/frequency";
 import {
   Form,
   FormControl,
@@ -591,26 +592,53 @@ export function HabitForm({
               <FormField
                 control={form.control}
                 name="frequency"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Frequency</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      value={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select frequency" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="daily">Daily</SelectItem>
-                        <SelectItem value="weekly">Weekly</SelectItem>
-                        <SelectItem value="monthly">Monthly</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </FormItem>
-                )}
+                render={({ field }) => {
+                  // S55: "Times per week" is stored as "3x per week" (no DB
+                  // change); the stepper picks N, the target stays per session.
+                  const freq = parseFrequency(field.value);
+                  return (
+                    <FormItem>
+                      <FormLabel>Frequency</FormLabel>
+                      <Select
+                        onValueChange={(kind) =>
+                          field.onChange(
+                            kind === "weekly"
+                              ? formatFrequency({ kind: "weekly", times: freq.kind === "weekly" ? freq.times : 3 })
+                              : kind,
+                          )
+                        }
+                        value={freq.kind}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select frequency" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="daily">Daily</SelectItem>
+                          <SelectItem value="weekly">Times per week</SelectItem>
+                          <SelectItem value="monthly">Monthly</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {freq.kind === "weekly" && (
+                        <div className="flex flex-wrap items-center gap-2 pt-1">
+                          <NumberStepper
+                            min={1}
+                            max={MAX_TIMES_PER_WEEK}
+                            value={freq.times}
+                            onChange={(v) => {
+                              const n = Math.min(Math.max(Number(v) || 1, 1), MAX_TIMES_PER_WEEK);
+                              field.onChange(formatFrequency({ kind: "weekly", times: n }));
+                            }}
+                            className="w-36"
+                            aria-label="Times per week"
+                          />
+                          <span className="text-sm text-muted-foreground">× per week, each time the target below</span>
+                        </div>
+                      )}
+                    </FormItem>
+                  );
+                }}
               />
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

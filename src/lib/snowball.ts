@@ -1,6 +1,7 @@
 import { addDays, differenceInCalendarDays, format, startOfDay } from "date-fns";
 import { supabase } from "@/lib/supabase";
 import type { Habit } from "@shared/schema";
+import { habitFrequency } from "@/lib/frequency";
 
 /**
  * Snowball habits: target_value holds the current target and is re-evaluated
@@ -62,10 +63,17 @@ export function scoreInterval(
     total += v;
     if (v >= target) hits++;
   }
+  // Legacy "weekly" = the target is a weekly total; "Nx per week" = N
+  // sessions that each meet the target (S55); monthly = one per ~30 days.
+  const freq = habitFrequency(habit);
   const rate =
     habit.frequency === "weekly"
       ? target > 0 ? total / (target * (days / 7)) : 1
-      : hits / days;
+      : freq.kind === "weekly"
+        ? hits / Math.max(1, (days * freq.times) / 7)
+        : freq.kind === "monthly"
+          ? hits / Math.max(1, days / 30)
+          : hits / days;
   if (rate >= GROW_RATE) return "up";
   if (rate < SHRINK_RATE) return "down";
   return "hold";

@@ -1,4 +1,4 @@
-import { addDays, startOfDay } from "date-fns";
+import { addDays, format, startOfDay } from "date-fns";
 import type { Habit } from "@shared/schema";
 
 /**
@@ -45,4 +45,25 @@ export function frequencyLabel(f: Frequency): string {
 export function weekStart(d: Date): Date {
   const day = startOfDay(d);
   return addDays(day, -((day.getDay() + 6) % 7));
+}
+
+/**
+ * S55: how many days of the Mon..Sun week containing `date` met the target.
+ * `override` lets a caller count a value that is being saved right now.
+ */
+export function weekDoneCount(
+  habit: Pick<Habit, "target_value">,
+  values: Record<string, number>,
+  date: Date,
+  override?: { date: string; value: number },
+): number {
+  const target = habit.target_value > 0 ? habit.target_value : 1;
+  const monday = weekStart(date);
+  let n = 0;
+  for (let i = 0; i < 7; i++) {
+    const key = format(addDays(monday, i), "yyyy-MM-dd");
+    const v = override && override.date === key ? override.value : values[key] || 0;
+    if (v >= target) n++;
+  }
+  return n;
 }
