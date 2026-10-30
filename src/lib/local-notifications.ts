@@ -311,7 +311,7 @@ export async function syncHabitReminders(habits: Habit[]): Promise<void> {
     // All notification ids that the current habits legitimately own.
     const wanted = new Set<number>();
     for (const h of habits) {
-      if (h.notify && h.notify_time) {
+      if (h.notify && h.notify_time && !h.archived_at) {
         for (const id of reminderIds(h.id)) wanted.add(id);
       }
     }
@@ -329,7 +329,7 @@ export async function syncHabitReminders(habits: Habit[]): Promise<void> {
     // Re-lay the rolling buffer for every habit that wants reminders. Resolve
     // the dream motivation for all of them in one batch first.
     if (await ensureNotificationPermission()) {
-      const wantedHabits = habits.filter((h) => h.notify && h.notify_time);
+      const wantedHabits = habits.filter((h) => h.notify && h.notify_time && !h.archived_at);
       const contentMap = await resolveContent(wantedHabits);
       for (const habit of wantedHabits) {
         await scheduleOne(habit, contentMap.get(habit.id));

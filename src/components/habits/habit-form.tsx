@@ -32,7 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Bell, Edit, Gift, Loader2, PlusCircle, X, Image as ImageIcon } from "lucide-react";
+import { Archive, Bell, Edit, Gift, Loader2, PlusCircle, X, Image as ImageIcon } from "lucide-react";
 import { ImageGallery } from "@/components/images/image-gallery";
 import { conversionFactor, isTimeUnit, sameTimeUnit, timeAltUnit } from "@/lib/units";
 import { getChance, getQuantity, makeChanceEntry, parseHabitChances } from "@/lib/habit-chances";
@@ -53,6 +53,7 @@ export function HabitForm({
   habit,
   onSuccess,
   onDelete,
+  onArchive,
   onClose,
 }: {
   goals: Goal[];
@@ -60,6 +61,8 @@ export function HabitForm({
   habit: Habit | null;
   onSuccess: () => void;
   onDelete?: () => void;
+  // S51: hide the habit but keep its history (restorable from the archive).
+  onArchive?: () => void;
   // Called whenever the dialog closes without saving, so the parent can clear
   // its "editing" state (otherwise the Add Habit button stays stuck on "Edit").
   onClose?: () => void;
@@ -1080,13 +1083,30 @@ export function HabitForm({
                 )}
               </div>
 
-              <div className="flex gap-2 justify-end items-center mt-6">
+              <div className="flex flex-wrap gap-2 justify-end items-center mt-6">
+                {habit && onArchive && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setDialogOpen(false);
+                      onArchive();
+                    }}
+                  >
+                    <Archive className="mr-2 h-4 w-4" />
+                    Archive
+                  </Button>
+                )}
                 {habit && onDelete && (
                   <Button
                     type="button"
                     variant="destructive"
                     onClick={() => {
-                      if (confirm("Are you sure you want to delete this habit?")) {
+                      if (
+                        confirm(
+                          "Delete this habit forever, including its whole history?\n\nTip: use Archive instead — the habit disappears from your list but you can restore it any time.",
+                        )
+                      ) {
                         onDelete();
                       }
                     }}

@@ -58,8 +58,14 @@ export type Habit = {
   notify: boolean;
   notify_time: string | null;
   last_notified_date: string | null;
+  // S51: archived habits are hidden everywhere (table, dashboard, widget,
+  // reminders) but keep their history for stats; null = active. Optional
+  // because the column only exists once S51_habit_archive.sql has run.
+  archived_at?: string | null;
   created_at: string;
 };
+
+export const isActiveHabit = (habit: Pick<Habit, "archived_at">) => !habit.archived_at;
 
 // One web-push subscription per browser/device (endpoint is unique).
 export type PushSubscriptionRow = {

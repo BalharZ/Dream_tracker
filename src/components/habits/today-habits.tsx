@@ -7,7 +7,7 @@ import { NumberStepper } from "@/components/ui/number-stepper";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
 import { Check, Repeat2 } from "lucide-react";
-import { Habit, Goal, Reward } from "@shared/schema";
+import { Habit, Goal, Reward, isActiveHabit } from "@shared/schema";
 import { supabase } from "@/lib/supabase";
 import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
@@ -228,6 +228,7 @@ export function TodayHabits() {
 
   // Only show habits whose goal still exists (mirrors the Habits page filter).
   const visibleHabits = (habits || []).filter((habit) => {
+    if (!isActiveHabit(habit)) return false;
     if (!habit.goal_id) return true;
     return goals?.some((goal) => goal.id === habit.goal_id);
   });

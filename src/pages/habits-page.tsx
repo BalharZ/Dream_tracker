@@ -3,11 +3,11 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Habit, Goal, Reward } from "@shared/schema";
+import { Habit, Goal, Reward, isActiveHabit } from "@shared/schema";
 import { supabase } from "@/lib/supabase";
 import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
-import { BarChart3, ChevronRight, Flame, Medal, TrendingUp } from "lucide-react";
+import { Archive, ArchiveRestore, BarChart3, ChevronRight, Flame, Medal, Trash2, TrendingUp } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { HabitForm } from "@/components/habits/habit-form";
@@ -85,6 +85,7 @@ function HabitsPage() {
   const [hiddenAlerts, setHiddenAlerts] = useState<number[]>([]);
   const [numberOfDays, setNumberOfDays] = useState(30);
   const [statsOpen, setStatsOpen] = useState(false);
+  const [archiveOpen, setArchiveOpen] = useState(false);
   const { toast } = useToast();
 
   const daysToShow = Array.from({ length: numberOfDays }, (_, i) => {
@@ -121,6 +122,33 @@ function HabitsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["habits"] });
       setHabitToEdit(null);
+    },
+  });
+
+  // S51: archive = hide but keep history; restore clears the flag again.
+  const setArchived = useMutation({
+    mutationFn: async ({ habitId, archived }: { habitId: number; archived: boolean }) => {
+      const { error } = await supabase
+        .from("habits")
+        .update({ archived_at: archived ? new Date().toISOString() : null })
+        .eq("id", habitId);
+      if (error) throw error;
+    },
+    onSuccess: (_, { archived }) => {
+      queryClient.invalidateQueries({ queryKey: ["habits"] });
+      setHabitToEdit(null);
+      toast({ title: archived ? "Habit archived" : "Habit restored" });
+    },
+    onError: (error: Error) => {
+      // The column only exists after supabase/sql/S51_habit_archive.sql ran.
+      const missingColumn = /archived_at/.test(error.message);
+      toast({
+        title: "Archive failed",
+        description: missingColumn
+          ? "The database is not ready for the archive yet (run S51_habit_archive.sql)."
+          : error.message,
+        variant: "destructive",
+      });
     },
   });
 
@@ -212,6 +240,14 @@ function HabitsPage() {
     return <div>Loading...</div>;
   }
 
+  // Habits shown in the table: active, and their goal (if any) still exists.
+  const tableHabits = (habits || []).filter((habit) => {
+    if (!isActiveHabit(habit)) return false;
+    if (!habit.goal_id) return true;
+    return goals?.some((goal) => goal.id === habit.goal_id);
+  });
+  const archivedHabits = (habits || []).filter((habit) => !isActiveHabit(habit));
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
@@ -231,6 +267,7 @@ function HabitsPage() {
           }}
           onClose={() => setHabitToEdit(null)}
           onDelete={habitToEdit ? () => deleteHabit.mutate(habitToEdit.id) : undefined}
+          onArchive={habitToEdit ? () => setArchived.mutate({ habitId: habitToEdit.id, archived: true }) : undefined}
         />
       </div>
 
@@ -252,11 +289,7 @@ function HabitsPage() {
                   <div className="w-14 sm:w-20 px-2 py-3 text-sm font-medium text-muted-foreground text-center">Target</div>
                 </div>
                 {/* Data rows */}
-                {habits?.filter(habit => {
-                  if (!habit.goal_id) return true;
-                  const goalExists = goals?.some(goal => goal.id === habit.goal_id);
-                  return goalExists;
-                }).map((habit) => {
+                {tableHabits.map((habit) => {
                   const streak = computeStreak(habit, progressMap[habit.id] || {});
                   return (
                   <div
@@ -341,11 +374,7 @@ function HabitsPage() {
                   ))}
                 </div>
                 {/* Data rows */}
-                {habits?.filter(habit => {
-                  if (!habit.goal_id) return true;
-                  const goalExists = goals?.some(goal => goal.id === habit.goal_id);
-                  return goalExists;
-                }).map((habit) => (
+                {tableHabits.map((habit) => (
                   <div
                     key={habit.id}
                     className="flex border-b"
@@ -392,7 +421,13 @@ function HabitsPage() {
             </div>
           </div>
 
-          <div className="flex justify-end gap-2 mt-4 px-4 pb-4 sm:px-0 sm:pb-0">
+          <div className="flex flex-wrap justify-end gap-2 mt-4 px-4 pb-4 sm:px-0 sm:pb-0">
+            {archivedHabits.length > 0 && (
+              <Button variant="outline" onClick={() => setArchiveOpen(true)}>
+                <Archive className="h-4 w-4 mr-2" />
+                Archive ({archivedHabits.length})
+              </Button>
+            )}
             <Button variant="outline" onClick={() => setStatsOpen(true)}>
               <BarChart3 className="h-4 w-4 mr-2" />
               Stats
@@ -432,6 +467,60 @@ function HabitsPage() {
       )}
 
       <HabitStatsDialog open={statsOpen} onOpenChange={setStatsOpen} habits={habits || []} />
+
+      <Dialog open={archiveOpen} onOpenChange={setArchiveOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Archived habits</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Archived habits are hidden from your list, dashboard and reminders. Their history stays
+            in your stats — restore one any time.
+          </p>
+          {archivedHabits.length === 0 ? (
+            <p className="text-sm text-muted-foreground">The archive is empty.</p>
+          ) : (
+            <ul className="space-y-2">
+              {archivedHabits.map((habit) => (
+                <li
+                  key={habit.id}
+                  className="flex flex-wrap items-center gap-2 rounded-lg border p-3"
+                  style={{ borderLeft: `4px solid ${habit.color}` }}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate font-semibold">{habit.name || "(untitled)"}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {habit.target_value} {habit.unit}
+                      {habit.archived_at && ` · archived ${format(new Date(habit.archived_at), "d MMM yyyy")}`}
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setArchived.mutate({ habitId: habit.id, archived: false })}
+                  >
+                    <ArchiveRestore className="h-4 w-4 mr-1" />
+                    Restore
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-destructive"
+                    aria-label={`Delete ${habit.name} forever`}
+                    onClick={() => {
+                      if (confirm(`Delete "${habit.name}" forever, including its whole history?`)) {
+                        deleteHabit.mutate(habit.id);
+                      }
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {selectedHabit && (
         <EditProgressDialog
