@@ -84,8 +84,12 @@ const DialogContent = React.forwardRef<
       {...props}
     >
       <CloseOnBack />
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-        <div className={cn("grid gap-4 p-6", bodyClassName)}>{children}</div>
+      {/* S52: the body may only scroll vertically. A plain `grid` sizes its
+          column to the widest child (long names, rows of steppers), which
+          pushed forms past the right edge on phones; minmax(0,1fr) pins the
+          column to the frame width so children shrink/wrap instead. */}
+      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain">
+        <div className={cn("grid grid-cols-[minmax(0,1fr)] gap-4 p-4 sm:p-6", bodyClassName)}>{children}</div>
       </div>
       {!hideClose && (
         <DialogPrimitive.Close className="absolute right-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-full border bg-background/85 text-muted-foreground shadow-sm backdrop-blur transition-colors hover:bg-accent hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
