@@ -10,6 +10,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Plus, Loader2, Trash2, ImageIcon, X } from "lucide-react";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormDescription } from "@/components/ui/form";
 import { useState } from "react";
+import { usePlan } from "@/hooks/use-plan";
 import { ImageGallery } from "@/components/images/image-gallery";
 import { DreamTile } from "@/components/dreams/dream-showcase";
 
@@ -26,6 +27,7 @@ type Dream = {
 
 export default function DreamsPage() {
   const { user } = useAuth();
+  const { allowCreate } = usePlan();
   const [open, setOpen] = useState(false);
   const [selectedDream, setSelectedDream] = useState<Dream | null>(null);
   const { data: dreams, isLoading } = useQuery({
@@ -66,7 +68,12 @@ export default function DreamsPage() {
 
         <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setSelectedDream(null); }}>
           <DialogTrigger asChild>
-            <Button>
+            <Button
+              onClick={(e) => {
+                // S57: Free plan allows FREE_LIMITS.dreams dreams.
+                if (!allowCreate("dreams", dreams?.length || 0)) e.preventDefault();
+              }}
+            >
               <Plus className="h-4 w-4 mr-2" />
               Add Dream
             </Button>

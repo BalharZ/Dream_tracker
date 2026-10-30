@@ -3,14 +3,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Capacitor } from "@capacitor/core";
 import { openExternalUrl } from "@/lib/local-notifications";
-import { Download, LogOut, RefreshCw, Settings as SettingsIcon } from "lucide-react";
+import { Crown, Download, LogOut, RefreshCw, Settings as SettingsIcon } from "lucide-react";
+import { usePlan, type Plan } from "@/hooks/use-plan";
 
 // Served from public/ by Vercel; the native shell loads the live site so the
 // download button only makes sense in a regular browser.
 const ANDROID_APK_URL = "/DreamTracker.apk";
 
+const PLAN_NAMES: Record<Plan, string> = { free: "Free", pro: "Pro Lifetime", pro_ai: "Pro + AI" };
+
 export default function SettingsPage() {
   const { user, logoutMutation } = useAuth();
+  const { plan, isPro, setTestPlan, openPaywall } = usePlan();
   const isNative = Capacitor.isNativePlatform();
 
   return (
@@ -41,6 +45,41 @@ export default function SettingsPage() {
             <LogOut className="mr-2 h-5 w-5" />
             Log out
           </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Crown className="h-5 w-5 text-amber-500" />
+            Plan
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-sm text-muted-foreground">Current plan</p>
+              <p className="font-medium">{PLAN_NAMES[plan]}</p>
+            </div>
+            {!isPro && <Button onClick={() => openPaywall("upgrade")}>See Pro</Button>}
+          </div>
+          {/* S57: TEST switch until payments exist (S66 replaces it with the
+              entitlements table). Only changes this browser. */}
+          <div className="space-y-2 rounded-lg border border-dashed p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Test mode — simulate a plan
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {(Object.keys(PLAN_NAMES) as Plan[]).map((p) => (
+                <Button key={p} size="sm" variant={plan === p ? "default" : "outline"} onClick={() => setTestPlan(p)}>
+                  {PLAN_NAMES[p]}
+                </Button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Payments are not live yet. This switch only affects this device and will be removed at launch.
+            </p>
+          </div>
         </CardContent>
       </Card>
 

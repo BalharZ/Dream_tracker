@@ -18,6 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NumberStepper } from "@/components/ui/number-stepper";
+import { usePlan } from "@/hooks/use-plan";
 import { formatFrequency, MAX_TIMES_PER_WEEK, parseFrequency } from "@/lib/frequency";
 import {
   Form,
@@ -56,6 +57,7 @@ export function HabitForm({
   onDelete,
   onArchive,
   onWeeklyRewards,
+  activeHabitCount = 0,
   onClose,
 }: {
   goals: Goal[];
@@ -67,12 +69,15 @@ export function HabitForm({
   onArchive?: () => void;
   // S56: open the weekly-rewards editor (only for saved N× per week habits).
   onWeeklyRewards?: () => void;
+  // S57: active habits right now, for the Free plan limit on "Add Habit".
+  activeHabitCount?: number;
   // Called whenever the dialog closes without saving, so the parent can clear
   // its "editing" state (otherwise the Add Habit button stays stuck on "Edit").
   onClose?: () => void;
 }) {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { allowCreate } = usePlan();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [showRewardSelector, setShowRewardSelector] = useState(false);
   const [noRewards, setNoRewards] = useState(false);
@@ -461,7 +466,10 @@ export function HabitForm({
         className={`${
           habit ? "bg-transparent border-2 border-primary hover:border-primary" : "bg-primary/10"
         } flex gap-2 items-center`}
-        onClick={() => setDialogOpen(true)}
+        onClick={() => {
+          if (!habit && !allowCreate("habits", activeHabitCount)) return;
+          setDialogOpen(true);
+        }}
       >
         {habit ? (
           <>

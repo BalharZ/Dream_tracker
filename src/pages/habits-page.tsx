@@ -312,6 +312,7 @@ function HabitsPage() {
           onDelete={habitToEdit ? () => deleteHabit.mutate(habitToEdit.id) : undefined}
           onArchive={habitToEdit ? () => setArchived.mutate({ habitId: habitToEdit.id, archived: true }) : undefined}
           onWeeklyRewards={habitToEdit ? () => setWeeklyEditorHabit(habitToEdit) : undefined}
+          activeHabitCount={(habits || []).filter(isActiveHabit).length}
         />
       </div>
 
