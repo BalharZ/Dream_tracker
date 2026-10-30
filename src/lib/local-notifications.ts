@@ -2,6 +2,7 @@ import { Capacitor, registerPlugin } from "@capacitor/core";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { supabase } from "@/lib/supabase";
 import type { Habit } from "@shared/schema";
+import { frequencyLabel, habitFrequency } from "@/lib/frequency";
 
 // Custom native plugin (android/app/.../reminders/HabitReminderPlugin.java).
 // It schedules exact self-repeating alarms and, at fire time, posts a
@@ -193,13 +194,25 @@ async function resolveContent(habits: Habit[]): Promise<Map<number, HabitContent
   return map;
 }
 
+/**
+ * S54: the title says what to do and how much — "⏰ Exercise — 1 h", plus
+ * the weekly quota for N× per week habits. Snowball targets are re-read on
+ * every sync (each app start), so the amount follows the current target.
+ */
+export function reminderTitle(habit: Habit): string {
+  const amount = habit.target_value > 0 ? `${habit.target_value} ${habit.unit || ""}`.trim() : "";
+  const freq = habitFrequency(habit);
+  const quota = freq.kind === "weekly" ? ` · ${frequencyLabel(freq)}` : "";
+  return `⏰ ${habit.name}${amount ? ` — ${amount}` : ""}${quota}`;
+}
+
 // Build the next REMINDER_DAYS one-shot exact notifications for a habit, skipping
 // any slot whose time has already passed today.
 function buildHabitNotifications(habit: Habit, content: HabitContent | undefined) {
   const { hour, minute } = parseTime(habit.notify_time);
   const base = habit.id * 100;
   const now = Date.now();
-  const title = `⏰ ${habit.name}`;
+  const title = reminderTitle(habit);
   const body = notificationBody(content);
   const notifications = [];
   for (let i = 0; i < REMINDER_DAYS; i++) {
@@ -238,7 +251,7 @@ async function scheduleOne(habit: Habit, content: HabitContent | undefined): Pro
           {
             id: habit.id,
             atMillis: at.getTime(),
-            title: `⏰ ${habit.name}`,
+            title: reminderTitle(habit),
             body: notificationBody(content),
             imageUrl: content?.image || "",
             hour,
