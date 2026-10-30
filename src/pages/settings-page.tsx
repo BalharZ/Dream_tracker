@@ -3,18 +3,58 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Capacitor } from "@capacitor/core";
 import { openExternalUrl } from "@/lib/local-notifications";
-import { Crown, Download, LogOut, RefreshCw, Settings as SettingsIcon } from "lucide-react";
+import { useState } from "react";
+import {
+  CloudUpload,
+  Crown,
+  Database,
+  Download,
+  FileJson,
+  FileSpreadsheet,
+  FileText,
+  History,
+  Loader2,
+  LogOut,
+  RefreshCw,
+  Settings as SettingsIcon,
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { exportUserData } from "@/lib/export-data";
 import { usePlan, type Plan } from "@/hooks/use-plan";
 
 // Served from public/ by Vercel; the native shell loads the live site so the
 // download button only makes sense in a regular browser.
 const ANDROID_APK_URL = "/DreamTracker.apk";
 
+// S59: nicer exports are Pro — shown greyed out next to the free JSON.
+const PRO_EXPORTS = [
+  { label: "Excel spreadsheet", Icon: FileSpreadsheet },
+  { label: "PDF report", Icon: FileText },
+  { label: "Automatic backup", Icon: CloudUpload },
+  { label: "Restore from backup", Icon: History },
+];
+
 const PLAN_NAMES: Record<Plan, string> = { free: "Free", pro: "Pro Lifetime", pro_ai: "Pro + AI" };
 
 export default function SettingsPage() {
   const { user, logoutMutation } = useAuth();
   const { plan, isPro, setTestPlan, openPaywall } = usePlan();
+  const { toast } = useToast();
+  const [exporting, setExporting] = useState(false);
+
+  const runExport = async () => {
+    if (!user) return;
+    setExporting(true);
+    try {
+      await exportUserData(user.id, user.email);
+    } catch (error: any) {
+      if (error?.name !== "AbortError") {
+        toast({ title: "Export failed", description: error?.message, variant: "destructive" });
+      }
+    } finally {
+      setExporting(false);
+    }
+  };
   const isNative = Capacitor.isNativePlatform();
 
   return (
@@ -79,6 +119,40 @@ export default function SettingsPage() {
             <p className="text-xs text-muted-foreground">
               Payments are not live yet. This switch only affects this device and will be removed at launch.
             </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Database className="h-5 w-5 text-primary" />
+            Your data
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-1">
+            <Button variant="outline" className="w-full justify-start" onClick={runExport} disabled={exporting}>
+              {exporting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <FileJson className="mr-2 h-5 w-5" />}
+              Export data (JSON)
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              A raw copy of all your dreams, goals, habits, history and rewards. Free in every plan.
+            </p>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {PRO_EXPORTS.map(({ label, Icon }) => (
+              <Button
+                key={label}
+                variant="outline"
+                className="justify-start opacity-60"
+                onClick={() => (isPro ? toast({ title: `${label} — coming soon` }) : openPaywall("export"))}
+              >
+                <Icon className="mr-2 h-5 w-5" />
+                {label}
+                <span className="ml-auto rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-bold text-amber-600">PRO</span>
+              </Button>
+            ))}
           </div>
         </CardContent>
       </Card>
