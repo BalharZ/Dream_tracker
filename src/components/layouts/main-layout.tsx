@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Capacitor } from "@capacitor/core";
+import { CoachChat } from "@/components/coach/coach-chat";
 import {
   LayoutDashboard,
   Star,
@@ -132,6 +133,9 @@ export default function MainLayout({
       <main className="flex-1 min-h-screen min-w-0 overflow-x-hidden">
         <div className="container mx-auto max-w-6xl p-4 pt-20 pb-28 sm:p-6 sm:pt-20 md:pt-8 md:pb-8">{children}</div>
       </main>
+
+      {/* S60: floating coach chat (guide now, AI coach for Pro + AI later). */}
+      <CoachChat />
     </div>
   );
 }
