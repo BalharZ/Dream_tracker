@@ -36,6 +36,8 @@ import {
 } from "@/lib/habit-stats";
 import { habitStrength } from "@/lib/habit-strength";
 import { StrengthCard } from "@/components/habits/habit-strength";
+import { Locked, Masked } from "@/components/plan/locked";
+import { usePlan } from "@/hooks/use-plan";
 
 type ProgressByHabit = Record<number, ValuesByDate>;
 
@@ -152,6 +154,7 @@ function cellStyle(state: DayState, color: string): React.CSSProperties {
 function Overview({ habits, progress, onSelect }: {
   habits: Habit[]; progress: ProgressByHabit; onSelect: (id: number) => void;
 }) {
+  const { isPro } = usePlan();
   const rows = useMemo(
     () =>
       habits.map((h) => {
@@ -178,6 +181,7 @@ function Overview({ habits, progress, onSelect }: {
 
   return (
     <div className="space-y-5">
+      <Locked title="Your averages and records across all habits.">
       <div className="grid grid-cols-3 gap-2">
         <div className="flex flex-col items-center gap-1 rounded-xl border bg-card p-3">
           <Ring value={avg} color="hsl(var(--primary))" size={64} stroke={7}>{pct(avg)}</Ring>
@@ -194,6 +198,7 @@ function Overview({ habits, progress, onSelect }: {
           <span className="line-clamp-2 text-[11px] text-muted-foreground">Best ever · {topBest.habit.name}</span>
         </div>
       </div>
+      </Locked>
 
       <p className="text-xs text-muted-foreground">Tap a habit for the full breakdown.</p>
 
@@ -207,7 +212,9 @@ function Overview({ habits, progress, onSelect }: {
           >
             <span className="absolute inset-y-0 left-0 w-1" style={{ backgroundColor: habit.color }} />
             <div className="flex items-center gap-3 pl-1">
-              <Ring value={month.now} color={habit.color}>{pct(month.now)}</Ring>
+              <div className={isPro ? undefined : "blur-[4px]"} aria-hidden={!isPro}>
+                <Ring value={month.now} color={habit.color}>{pct(month.now)}</Ring>
+              </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1">
                   <span className="truncate font-semibold">{habit.name}</span>
@@ -219,11 +226,11 @@ function Overview({ habits, progress, onSelect }: {
                   </span>
                   <span className="inline-flex items-center gap-0.5"><Flame className="h-3 w-3 text-orange-500" />{streak}</span>
                   <span className="inline-flex items-center gap-0.5"><Trophy className="h-3 w-3 text-amber-500" />{best}</span>
-                  <TrendBadge now={month.now} before={month.before} />
+                  {isPro ? <TrendBadge now={month.now} before={month.before} /> : <Masked length={3} />}
                 </div>
               </div>
             </div>
-            <div className="mt-3 grid grid-cols-[repeat(28,minmax(0,1fr))] gap-[2px] pl-1">
+            <div className={cn("mt-3 grid grid-cols-[repeat(28,minmax(0,1fr))] gap-[2px] pl-1", !isPro && "blur-[3px]")}>
               {last28.map((c) => (
                 <span key={c.date.toISOString()} className="aspect-square rounded-[2px]" style={cellStyle(c.state, habit.color)} />
               ))}
@@ -273,6 +280,7 @@ function ChartTip({ active, payload, label, unit }: any) {
 }
 
 function HabitDetail({ habit, values }: { habit: Habit; values: ValuesByDate }) {
+  const { isPro } = usePlan();
   const [range, setRange] = useState(90);
   const color = habit.color;
 
@@ -323,10 +331,21 @@ function HabitDetail({ habit, values }: { habit: Habit; values: ValuesByDate }) 
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Kpi icon={<Flame className="h-4 w-4 text-orange-500" />} value={current} label="Current streak" />
-        <Kpi icon={<Trophy className="h-4 w-4 text-amber-500" />} value={best} label="Best streak" />
-        <Kpi icon={<span className="h-3 w-3 rounded-full" style={{ backgroundColor: color }} />} value={allTime.done} label="Days done (all time)" />
-        <Kpi icon={<BarChart3 className="h-4 w-4" />} value={pct(allTime.rate)} label="Success (all time)" />
+        <Kpi icon={<Trophy className="h-4 w-4 text-amber-500" />} value={isPro ? best : <Masked length={2} />} label="Best streak" />
+        <Kpi icon={<span className="h-3 w-3 rounded-full" style={{ backgroundColor: color }} />} value={isPro ? allTime.done : <Masked length={3} />} label="Days done (all time)" />
+        <Kpi icon={<BarChart3 className="h-4 w-4" />} value={isPro ? pct(allTime.rate) : <Masked length={3} />} label="Success (all time)" />
       </div>
+
+      {!isPro && (
+        <ul className="space-y-1.5 rounded-xl border border-dashed p-3 text-sm">
+          <li>📉 Your weakest day is <Masked length={6} /> — fix it and the habit gets easier.</li>
+          <li>🏆 Your best streak ever: <Masked length={2} /> days. Can you beat it?</li>
+          <li>📈 Last 30 days you are <Masked length={3} /> vs the 30 days before.</li>
+        </ul>
+      )}
+
+      <Locked title="Trends, best & weakest days, the year view and your longest streaks — see exactly what works for you.">
+      <div className="space-y-4">
 
       <Section title="Getting better or worse?">
         <div className="grid grid-cols-3 gap-2">
@@ -475,6 +494,8 @@ function HabitDetail({ habit, values }: { habit: Habit; values: ValuesByDate }) 
           </ol>
         )}
       </Section>
+      </div>
+      </Locked>
     </div>
   );
 }

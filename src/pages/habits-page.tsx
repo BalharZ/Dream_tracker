@@ -20,6 +20,7 @@ import { computeStreak } from "@/lib/streaks";
 import { frequencyLabel, habitFrequency, weekDoneCount } from "@/lib/frequency";
 import { StrengthChip } from "@/components/habits/habit-strength";
 import { WeeklyRewardsDialog } from "@/components/habits/weekly-rewards-dialog";
+import { FREE_LIMITS, usePlan } from "@/hooks/use-plan";
 import { ToastAction } from "@/components/ui/toast";
 import { parseHabitChances, weeklyChanceKey } from "@/lib/habit-chances";
 import { syncHabitReminders } from "@/lib/local-notifications";
@@ -28,6 +29,7 @@ type ProgressMap = Record<number, Record<string, number>>;
 
 function HabitsPage() {
   const { user } = useAuth();
+  const { isPro, openPaywall } = usePlan();
   const [habitToEdit, setHabitToEdit] = useState<Habit | null>(null);
   const [selectedHabit, setSelectedHabit] = useState<Habit | null>(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -490,7 +492,14 @@ function HabitsPage() {
             </Button>
             <Button
               variant="outline"
-              onClick={() => setNumberOfDays(prev => prev + 30)}
+              onClick={() => {
+                // S58: Free shows the last 3 months; more history is Pro.
+                if (!isPro && numberOfDays + 30 > FREE_LIMITS.historyDays) {
+                  openPaywall("history");
+                  return;
+                }
+                setNumberOfDays(prev => prev + 30);
+              }}
             >
               <ChevronRight className="h-4 w-4 mr-2" />
               Load more history
