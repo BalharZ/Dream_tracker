@@ -506,7 +506,7 @@ Detail viz `docs/NAMING.md` (sekce „Provedeno"). Viditelný název → Northst
 > **Neověřeno v přihlášené aplikaci** (Claude se nepřihlašuje do produkční DB). Majitel projde checklist níž.
 >
 > **Ruční kroky majitele před nasazením:**
-> 1. Spustit `supabase/sql/S51_habit_archive.sql` v Supabase SQL editoru (sloupec `archived_at` + widget bez archivovaných).
+> 1. ~~Spustit `supabase/sql/S51_habit_archive.sql`~~ ✅ spuštěno 2026-10-31 a ověřeno (sloupec `archived_at` existuje, `widget_get_today` filtruje archivované).
 > 2. Projít aplikaci lokálně (`npm run dev`), pak větev mergnout do `main` a pushnout (Vercel nasadí, appka se načte živě).
 > 3. Pozor: po nasazení jsou všichni na **Free** (limit 3 sny / 5 zvyků pro *nové* položky). Pro test přepni plán v Nastavení → Plan → Test mode.
 
