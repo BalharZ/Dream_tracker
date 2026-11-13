@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { recomputeProgress } from "@/lib/progress";
 import { applySnowballGrowth } from "@/lib/snowball";
 import { syncHabitReminders } from "@/lib/local-notifications";
+import { habitFrequency, periodDoneCount, periodStart, weekStart } from "@/lib/frequency";
 import { RewardRoulette } from "@/components/habits/reward-roulette";
 
 /**
@@ -110,6 +111,28 @@ export function TodayHabits() {
     enabled: !!user,
   });
 
+  // S55: N× per week / month habits show how much of the period's quota is
+  // done. Fetch from the start of this week or month, whichever is earlier.
+  const periodFrom = format(
+    [weekStart(today), periodStart({ kind: "monthly", times: 1 }, today)].reduce((a, b) => (a < b ? a : b)),
+    "yyyy-MM-dd",
+  );
+  const { data: periodProgress } = useQuery({
+    queryKey: ["habit_progress_period", user?.id, periodFrom],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("habit_progress")
+        .select("habit_id, date, value")
+        .eq("user_id", user!.id)
+        .gte("date", periodFrom);
+      if (error) throw error;
+      const map: Record<number, Record<string, number>> = {};
+      (data || []).forEach((p) => ((map[p.habit_id] ||= {})[p.date] = p.value));
+      return map;
+    },
+    enabled: !!user,
+  });
+
   // Lazily apply due snowball increases (the dashboard is usually the first
   // page that loads habits). A write invalidates the query; the refetched
   // habits have nothing due, so this cannot loop.
@@ -163,6 +186,7 @@ export function TodayHabits() {
       queryClient.invalidateQueries({ queryKey: ["goals"] });
       queryClient.invalidateQueries({ queryKey: ["dreams"] });
       queryClient.invalidateQueries({ queryKey: ["habit_progress_today"] });
+      queryClient.invalidateQueries({ queryKey: ["habit_progress_period"] });
       queryClient.invalidateQueries({ queryKey: ["habit_progress_all"] });
     },
     onError: (error) => {
@@ -255,6 +279,15 @@ export function TodayHabits() {
               const value = values[habit.id] ?? 0;
               const numeric = typeof value === "string" ? Number(value) || 0 : value;
               const done = numeric >= habit.target_value;
+              const freq = habitFrequency(habit);
+              // Count today's on-screen value, even before its save lands.
+              const periodDone =
+                freq.kind === "daily"
+                  ? null
+                  : periodDoneCount(habit, freq, periodProgress?.[habit.id] || {}, today, {
+                      date: dateStr,
+                      value: numeric,
+                    });
               return (
                 <div
                   key={habit.id}
@@ -265,8 +298,24 @@ export function TodayHabits() {
                   }}
                 >
                   <div className="min-w-0">
-                    <div className="font-medium text-sm break-words" style={{ color: habit.color }}>
-                      {habit.name}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="font-medium text-sm break-words" style={{ color: habit.color }}>
+                        {habit.name}
+                      </div>
+                      {periodDone !== null && freq.kind !== "daily" && (
+                        <span
+                          className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                          style={
+                            periodDone >= freq.times
+                              ? { backgroundColor: habit.color, color: "#fff" }
+                              : { backgroundColor: `${habit.color}22`, color: habit.color }
+                          }
+                          title={`Days done this ${freq.kind === "weekly" ? "week" : "month"}`}
+                        >
+                          {periodDone >= freq.times ? "✓ " : ""}
+                          {Math.min(periodDone, freq.times)}/{freq.times} this {freq.kind === "weekly" ? "week" : "month"}
+                        </span>
+                      )}
                     </div>
                     <div className="text-xs text-muted-foreground">
                       Target: {habit.target_value} {habit.unit}

@@ -517,7 +517,7 @@ Detail viz `docs/NAMING.md` (sekce „Provedeno"). Viditelný název → Northst
 - [x] **S53 Síla zvyku** ✅ 2026-10-30 — `src/lib/habit-strength.ts` (vzorec MONETIZATION §3, otestovaný), štítek 💪 % v tabulce místo medaile 21 dní, karta s prstencem, úrovní a milníky ve Stats, % v přehledu Stats.
 - [x] **S54 Notifikace: co a kolik** ✅ 2026-10-30 — titulek „⏰ Exercise — 1 h · 3× / week“ (nativní i záložní cesta). Bez nového APK, appka načítá web živě.
 - [x] **S55 Týdenní zvyky N× týdně** ✅ 2026-10-30 — frekvence „Times per week“ + stepper 1–6 (`"3x per week"`), v tabulce splněný den 50 % barvy, po splnění týdne 100 % zpětně, hláška „Week complete!“. Snowball počítá N× týdně správně.
-  *Zbývá:* dashboard zatím neukazuje stav týdne (jen tabulka Habits).
+  ✅ 2026-11-13: dashboard ukazuje u N× týdně / měsíčně štítek „2/3 this week“, po splnění plnou barvou s ✓ (počítá i právě zadanou dnešní hodnotu).
 - [x] **S56 Týdenní odměny** ✅ 2026-10-30 — tlačítko „Weekly rewards“ u týdenního zvyku (editor šancí, klíč `w<id>`), po splnění týdne týdenní ruleta (po denní). Bez týdenních odměn hláška nabídne „Add weekly reward“.
 - [x] **S57 Free/Pro základ** ✅ 2026-10-30 — `usePlan()` + testovací přepínač v Nastavení, limity 3 sny / 5 aktivních zvyků, paywall dialog podle kontextu (tlačítka „Coming soon“).
 - [x] **S58 Stats paywall** ✅ 2026-10-30 — Free vidí sílu zvyku a aktuální sérii, zbytek jsou rozmazaná skutečná data se zámkem a teasery (weakest day, best streak). Historie v tabulce max. 90 dní.
