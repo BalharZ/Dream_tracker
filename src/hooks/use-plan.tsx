@@ -11,7 +11,18 @@ import { PaywallDialog, type PaywallReason } from "@/components/plan/paywall-dia
  */
 export type Plan = "free" | "pro" | "pro_ai";
 
-export const FREE_LIMITS = { dreams: 3, habits: 5, historyDays: 90 } as const;
+// Free is a trial, not a full app (owner, 2026-11-13): goals count top-level
+// goals (subgoals are free), habits count active (non-archived) ones.
+export const FREE_LIMITS = { dreams: 2, goals: 4, rewards: 3, habits: 3, historyDays: 90 } as const;
+
+export type LimitedKind = "dreams" | "goals" | "rewards" | "habits";
+
+const LIMIT_REASON: Record<LimitedKind, PaywallReason> = {
+  dreams: "dream-limit",
+  goals: "goal-limit",
+  rewards: "reward-limit",
+  habits: "habit-limit",
+};
 
 const TEST_PLAN_KEY = "ns-test-plan";
 
@@ -31,7 +42,7 @@ type PlanContextValue = {
   setTestPlan: (plan: Plan) => void;
   openPaywall: (reason: PaywallReason) => void;
   /** True when a free user may still add one more; otherwise opens the paywall. */
-  allowCreate: (kind: "dreams" | "habits", currentCount: number) => boolean;
+  allowCreate: (kind: LimitedKind, currentCount: number) => boolean;
 };
 
 const PlanContext = createContext<PlanContextValue | null>(null);
@@ -52,9 +63,9 @@ export function PlanProvider({ children }: { children: ReactNode }) {
   const isPro = plan !== "free";
 
   const allowCreate = useCallback(
-    (kind: "dreams" | "habits", currentCount: number) => {
+    (kind: LimitedKind, currentCount: number) => {
       if (isPro || currentCount < FREE_LIMITS[kind]) return true;
-      setPaywall(kind === "dreams" ? "dream-limit" : "habit-limit");
+      setPaywall(LIMIT_REASON[kind]);
       return false;
     },
     [isPro],

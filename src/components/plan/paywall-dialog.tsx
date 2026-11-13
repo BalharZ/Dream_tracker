@@ -6,6 +6,8 @@ import { cn } from "@/lib/utils";
 /** Why the paywall opened — picks the headline so it always matches what the user just tried. */
 export type PaywallReason =
   | "dream-limit"
+  | "goal-limit"
+  | "reward-limit"
   | "habit-limit"
   | "stats"
   | "history"
@@ -16,15 +18,17 @@ export type PaywallReason =
   | "upgrade";
 
 const HEADLINES: Record<PaywallReason, { title: string; text: string }> = {
-  "dream-limit": { title: "Dream bigger with Pro", text: "Free covers 3 dreams. Pro has no limits — add every dream you have." },
-  "habit-limit": { title: "More habits with Pro", text: "Free covers 5 active habits. Archive one, or go Pro for unlimited habits." },
+  "dream-limit": { title: "Dream bigger with Pro", text: "Free covers 2 dreams. Pro has no limits — add every dream you have." },
+  "goal-limit": { title: "More goals with Pro", text: "Free covers 4 goals. Pro has no limits — break every dream into as many goals as it needs." },
+  "reward-limit": { title: "More rewards with Pro", text: "Free covers 3 rewards. Go Pro and treat yourself to as many as you like." },
+  "habit-limit": { title: "More habits with Pro", text: "Free covers 3 active habits. Archive one, or go Pro for unlimited habits." },
   stats: { title: "See what really works", text: "Pro unlocks every chart: trends, best and weakest days, the year view and when you'll reach your goal." },
   history: { title: "Your whole history", text: "Free shows the last 3 months. Pro keeps your entire history in view." },
   export: { title: "Beautiful exports", text: "Pro exports to Excel and PDF reports, with automatic backups you can restore." },
   "ai-coach": { title: "Meet your AI coach", text: "Break dreams into goals, plan your week and get a weekly review — with Pro + AI." },
   "ai-images": { title: "Picture your dream", text: "Generate images of your dream — even you, at your goal — with Pro + AI." },
   reminders: { title: "Smarter reminders", text: "Motivational reminders, several a day and at the time you usually act — with Pro." },
-  upgrade: { title: "Go further with Northstar Pro", text: "Unlimited dreams and habits, full stats, exports — and an AI coach." },
+  upgrade: { title: "Go further with Northstar Pro", text: "Unlimited dreams, goals, habits and rewards, full stats, exports — and an AI coach." },
 };
 
 // Prices from docs/MONETIZATION.md §2 — shown for the test build only; real
@@ -35,7 +39,7 @@ const PLANS = [
     name: "Pro Lifetime",
     price: "$99",
     note: "one-time · launch price (list $149)",
-    features: ["Unlimited dreams & habits", "Full stats & history", "Excel / PDF export, backups", "Themes & icons"],
+    features: ["Unlimited dreams, goals, habits & rewards", "Full stats & history", "Excel / PDF export, backups", "Themes & icons"],
   },
   {
     id: "pro_ai",

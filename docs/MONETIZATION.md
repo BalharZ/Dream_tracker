@@ -18,15 +18,17 @@
 - **Lifetime nikdy neobsahuje AI.** AI stojí peníze každý měsíc.
 - **Vlastní garance vrácení peněz nebude.** Platí jen standard Google Play: žádost do 48 h přes Play,
   potom podle uvážení. Free verze slouží jako zkouška. V Terms uvést, že po využití AI se nevrací.
-- **Limit Free 3 sny / 5 zvyků zůstává.** Pro má táhnout hloubka a hodnota, ne škrcení základu.
+- **Limity Free (změna 2026-11-13): 2 sny, 4 cíle (hlavní, podcíle se nepočítají), 3 odměny, 3 aktivní zvyky.**
+  Free je zkouška, ne plná appka; známější trackery mají ve Free taky 3 zvyky a my jdeme hlouběji. Reklamy nebudou.
+  Limity se můžou ještě zpřísnit. (Původně 3 sny / 5 zvyků.)
 
 ### Free vs Pro
 
 | Oblast | Free | Pro |
 |---|---|---|
-| Sny / zvyky | 3 sny, 5 zvyků | neomezeně |
+| Sny / cíle / odměny / zvyky | 2 sny, 4 cíle, 3 odměny, 3 zvyky | neomezeně |
 | Archiv zvyků | ✅ | ✅ |
-| Týdenní zvyky (N× týdně) | ✅ | ✅ |
+| Týdenní a měsíční zvyky (N× týdně / měsíčně) | ✅ | ✅ |
 | Připomínky | základní + název a množství + záchrana série | motivační a chytré (víc denně, adaptivní čas, týdenní souhrn) |
 | Stats | **Síla zvyku** + série; v tabulce historie 3 měsíce | celé Stats + neomezená historie + odhad dosažení cíle |
 | Obrázky | vlastní upload / odkaz | AI generování, témata, ikony |

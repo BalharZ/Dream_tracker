@@ -197,13 +197,13 @@ async function resolveContent(habits: Habit[]): Promise<Map<number, HabitContent
 
 /**
  * S54: the title says what to do and how much — "⏰ Exercise — 1 h", plus
- * the weekly quota for N× per week habits. Snowball targets are re-read on
+ * the quota for N× per week / month habits. Snowball targets are re-read on
  * every sync (each app start), so the amount follows the current target.
  */
 export function reminderTitle(habit: Habit): string {
   const amount = habit.target_value > 0 ? `${habit.target_value} ${habit.unit || ""}`.trim() : "";
   const freq = habitFrequency(habit);
-  const quota = freq.kind === "weekly" ? ` · ${frequencyLabel(freq)}` : "";
+  const quota = freq.kind !== "daily" ? ` · ${frequencyLabel(freq)}` : "";
   return `⏰ ${habit.name}${amount ? ` — ${amount}` : ""}${quota}`;
 }
 

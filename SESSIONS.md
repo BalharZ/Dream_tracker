@@ -508,7 +508,7 @@ Detail viz `docs/NAMING.md` (sekce „Provedeno"). Viditelný název → Northst
 > **Ruční kroky majitele před nasazením:**
 > 1. ~~Spustit `supabase/sql/S51_habit_archive.sql`~~ ✅ spuštěno 2026-10-31 a ověřeno (sloupec `archived_at` existuje, `widget_get_today` filtruje archivované).
 > 2. Projít aplikaci lokálně (`npm run dev`), pak větev mergnout do `main` a pushnout (Vercel nasadí, appka se načte živě).
-> 3. Pozor: po nasazení jsou všichni na **Free** (limit 3 sny / 5 zvyků pro *nové* položky). Pro test přepni plán v Nastavení → Plan → Test mode.
+> 3. Pozor: po nasazení jsou všichni na **Free** (limit 2 sny / 4 cíle / 3 odměny / 3 zvyky pro *nové* položky, od S71). Pro test přepni plán v Nastavení → Plan → Test mode.
 
 - [x] **S51 Archiv zvyků** ✅ 2026-10-30 — tlačítko Archive v dialogu zvyku, Delete radí archivovat, na stránce Habits „Archive (N)“ s Restore / Delete forever. Archivované zmizí z tabulky, dashboardu, notifikací a (po SQL) z widgetu.
   *Ověř:* archivuj zvyk → zmizí, v Archive ho obnov → vrátí se i s historií.
@@ -525,6 +525,13 @@ Detail viz `docs/NAMING.md` (sekce „Provedeno"). Viditelný název → Northst
 - [x] **S60 Chat s tutoriálem** ✅ 2026-10-30 — plovoucí ikona (minimalizovat / skrýt do proužku u okraje), průvodce sen → cíl → zvyk → odměna (hlídá Free limity), FAQ, ukázka AI kouče.
   *Majitel:* nahraj video ukázku jako `public/coach-demo.mp4`.
 - [x] **S61 Záchrana série** ✅ 2026-10-30 (část Free) — ve 21:00 jen pro nesplněný denní zvyk se sérií 3+ dny. Plánuje se na „dnes“ při každém otevření appky a po splnění se zruší.
+- [x] **S71 Opravy od majitele (2026-11-13)** ✅ — necommitnuto.
+  1. **Chat v menu:** plovoucí bublina zrušena, „Coach“ je ve spodní liště vpravo vedle Habits a v postranním menu na desktopu.
+  2. **Tabulka Habits:** pevná výška řádků (`ROW_HEIGHT`, 56 px) vlevo (zvyk, Target) i vpravo (datumy), takže řádky vždycky lícují. Target ukazuje jen číslo, u snowballu šipku; jednotka a frekvence jsou v tooltipu.
+  3. **Frekvence Daily / Weekly / Monthly:** měsíční funguje jako týdenní („2x per month“, stepper 1–20, půlbarva do splnění měsíce, hláška „Month complete!“). Síla zvyku, snowball i notifikace počítají N× měsíčně. Starý „monthly“ = 1× měsíčně. Týdenní ruleta zůstává jen u týdenních.
+  4. **Síla zvyku:** ikona činky nahrazena malým prstencem (činka vypadala jako ikona posilovny u každého zvyku).
+  5. **Limity Free:** 2 sny, 4 hlavní cíle, 3 odměny, 3 aktivní zvyky (`FREE_LIMITS`); paywall i u cílů a odměn (Add, Browse, nová odměna ve formuláři zvyku), průvodce v chatu hlídá všechny čtyři.
+  *Ověřeno:* `tsc`, `vite build`, dočasný náhled s falešnými daty (375 px): řádky 56/56 px na obou stranách, Coach v menu otevře/zavře chat, formulář ukazuje Monthly 2×. Přihlášenou appku musí projít majitel.
 - [ ] **S61b Chytré připomínky Pro** — víc připomínek denně, adaptivní čas, nedělní souhrn. Pozn.: kontrola splnění v okamžiku zazvonění vyžaduje úpravu nativního pluginu → nové APK.
 - [x] **S62 Právní texty** ✅ 2026-10-30 — `public/privacy.html`, `public/terms.html`, odkazy v Nastavení.
   *Majitel:* doplnit žlutá pole [TODO] (firma, IČO, adresa, e-mail, region Supabase) a nechat zkontrolovat.

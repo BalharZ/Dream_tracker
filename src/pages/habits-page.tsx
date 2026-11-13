@@ -17,15 +17,20 @@ import { HabitStatsDialog } from "@/components/habits/habit-stats";
 import { recomputeProgress } from "@/lib/progress";
 import { applySnowballGrowth } from "@/lib/snowball";
 import { computeStreak } from "@/lib/streaks";
-import { frequencyLabel, habitFrequency, weekDoneCount } from "@/lib/frequency";
+import { frequencyLabel, habitFrequency, periodDoneCount } from "@/lib/frequency";
 import { StrengthChip } from "@/components/habits/habit-strength";
 import { WeeklyRewardsDialog } from "@/components/habits/weekly-rewards-dialog";
 import { FREE_LIMITS, usePlan } from "@/hooks/use-plan";
 import { ToastAction } from "@/components/ui/toast";
 import { parseHabitChances, weeklyChanceKey } from "@/lib/habit-chances";
 import { syncHabitReminders } from "@/lib/local-notifications";
+import { cn } from "@/lib/utils";
 
 type ProgressMap = Record<number, Record<string, number>>;
+
+// One fixed height for both halves of the History table (names/target on the
+// left, dates on the right), so the rows always line up — whatever wraps.
+const ROW_HEIGHT = "h-14 overflow-hidden";
 
 function HabitsPage() {
   const { user } = useAuth();
@@ -205,25 +210,27 @@ function HabitsPage() {
       clearTimeout(lastUpdate.timeout);
     }
 
-    // S55/S56: the moment a N× per week habit reaches its weekly quota —
-    // celebrate, and spin the weekly roulette (after the daily one) or offer
-    // to set weekly rewards up.
+    // S55/S56: the moment a N× per week/month habit reaches its quota —
+    // celebrate; a weekly one also spins the weekly roulette (after the daily
+    // one) or offers to set weekly rewards up.
     const freq = habitFrequency(habit);
-    let weekJustCompleted = false;
-    if (freq.kind === "weekly") {
+    let periodJustCompleted = false;
+    if (freq.kind !== "daily") {
       const values = progressMap[habitId] || {};
       const day = new Date(date + "T00:00:00");
-      const before = weekDoneCount(habit, values, day);
-      const after = weekDoneCount(habit, values, day, { date, value });
-      weekJustCompleted = before < freq.times && after >= freq.times;
+      const before = periodDoneCount(habit, freq, values, day);
+      const after = periodDoneCount(habit, freq, values, day, { date, value });
+      periodJustCompleted = before < freq.times && after >= freq.times;
     }
+    const weekJustCompleted = periodJustCompleted && freq.kind === "weekly";
     const weeklyRewards = (rewards || []).filter(
       (r) => parseHabitChances(r.habit_chances)[weeklyChanceKey(habitId)] !== undefined,
     );
-    if (weekJustCompleted) {
+    if (periodJustCompleted && freq.kind !== "daily") {
+      const period = freq.kind === "weekly" ? "week" : "month";
       toast({
-        title: "Week complete! 🎉",
-        description: `${habit.name}: ${freq.kind === "weekly" ? freq.times : 1}× this week — the whole week is filled in.`,
+        title: `${freq.kind === "weekly" ? "Week" : "Month"} complete! 🎉`,
+        description: `${habit.name}: ${freq.times}× this ${period} — the whole ${period} is filled in.`,
         action:
           weeklyRewards.length === 0 ? (
             <ToastAction altText="Add a weekly reward" onClick={() => setWeeklyEditorHabit(habit)}>
@@ -341,13 +348,13 @@ function HabitsPage() {
                   return (
                   <div
                     key={habit.id}
-                    className="flex border-b"
+                    className={cn("flex border-b", ROW_HEIGHT)}
                     style={{
                       backgroundColor: `${habit.color}10`,
                       borderLeft: `4px solid ${habit.color}`
                     }}
                   >
-                    <div className="w-44 sm:w-56 px-2 sm:px-3 py-3 flex items-center gap-1 min-w-0">
+                    <div className="w-44 sm:w-56 px-2 sm:px-3 flex items-center gap-1 min-w-0">
                       <Button
                         variant="link"
                         className="h-auto p-0 text-left min-w-0"
@@ -377,16 +384,18 @@ function HabitsPage() {
                         </span>
                       ) : null}
                     </div>
+                    {/* Target: just the number (+ arrow for snowball) — unit and
+                        frequency stay out so the cell never wraps (owner). */}
                     <div
-                      className="w-14 sm:w-20 px-2 py-3 flex flex-col items-center justify-center cursor-pointer hover:bg-black/5"
+                      className="w-14 sm:w-20 px-1 flex items-center justify-center cursor-pointer hover:bg-black/5"
                       style={{ color: habit.color }}
-                      title="Klikni pro úpravu návyku"
+                      title={`${habit.target_value} ${habit.unit || ""} · ${frequencyLabel(habitFrequency(habit))} — klikni pro úpravu návyku`}
                       onClick={(e) => {
                         e.stopPropagation();
                         setHabitToEdit(habit);
                       }}
                     >
-                      <span className="text-base font-bold leading-tight flex items-center gap-0.5">
+                      <span className="text-base font-bold leading-none flex items-center gap-0.5 whitespace-nowrap">
                         {habit.target_value}
                         {habit.habit_type === "snowball" && (
                           <TrendingUp
@@ -395,10 +404,6 @@ function HabitsPage() {
                           />
                         )}
                       </span>
-                      <span className="text-[10px] leading-tight">{habit.unit}</span>
-                      {habitFrequency(habit).kind !== "daily" && (
-                        <span className="text-[9px] leading-tight opacity-80">{frequencyLabel(habitFrequency(habit))}</span>
-                      )}
                     </div>
                   </div>
                 );
@@ -419,25 +424,25 @@ function HabitsPage() {
                 {tableHabits.map((habit) => (
                   <div
                     key={habit.id}
-                    className="flex border-b"
+                    className={cn("flex border-b", ROW_HEIGHT)}
                     style={{ backgroundColor: `${habit.color}10` }}
                   >
                     {daysToShow.map((date, i) => {
                       const dateStr = format(date, "yyyy-MM-dd");
                       const value = progressMap[habit.id]?.[dateStr] || 0;
                       const isTargetMet = value >= habit.target_value;
-                      // S55: N× per week — a done day is half-coloured until
-                      // the week's quota is met, then the whole week turns full.
+                      // S55: N× per week/month — a done day is half-coloured
+                      // until the period's quota is met, then it all turns full.
                       const freq = habitFrequency(habit);
                       const weekPending =
-                        freq.kind === "weekly" &&
+                        freq.kind !== "daily" &&
                         isTargetMet &&
-                        weekDoneCount(habit, progressMap[habit.id] || {}, date) < freq.times;
+                        periodDoneCount(habit, freq, progressMap[habit.id] || {}, date) < freq.times;
 
                       return (
                         <div
                           key={i}
-                          className="w-14 sm:w-16 flex-shrink-0 px-1 py-2 cursor-pointer transition-all hover:scale-110"
+                          className="w-14 sm:w-16 flex-shrink-0 px-1 flex items-center justify-center cursor-pointer transition-all hover:scale-110"
                           onClick={() => {
                             setSelectedHabit(habit);
                             setSelectedDate(date);
@@ -445,13 +450,13 @@ function HabitsPage() {
                           }}
                         >
                           <div
-                            className="flex flex-col items-center rounded-md py-0.5"
+                            className="flex w-full flex-col items-center rounded-md py-0.5"
                             style={
                               isTargetMet && value > 0
                                 ? { backgroundColor: `${habit.color}${weekPending ? "1a" : "33"}` }
                                 : undefined
                             }
-                            title={weekPending ? "Done — finish the week to fill it in" : undefined}
+                            title={weekPending ? `Done — finish the ${freq.kind === "monthly" ? "month" : "week"} to fill it in` : undefined}
                           >
                             <div
                               className="text-base font-medium"
@@ -466,7 +471,7 @@ function HabitsPage() {
                             >
                               {value}
                             </div>
-                            <div className="text-xs text-gray-500">
+                            <div className="max-w-full truncate text-xs text-gray-500">
                               {habit.unit}
                             </div>
                           </div>

@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NumberStepper } from "@/components/ui/number-stepper";
 import { usePlan } from "@/hooks/use-plan";
-import { formatFrequency, MAX_TIMES_PER_WEEK, parseFrequency } from "@/lib/frequency";
+import { formatFrequency, MAX_TIMES_PER_MONTH, MAX_TIMES_PER_WEEK, parseFrequency } from "@/lib/frequency";
 import {
   Form,
   FormControl,
@@ -604,17 +604,22 @@ export function HabitForm({
                 control={form.control}
                 name="frequency"
                 render={({ field }) => {
-                  // S55: "Times per week" is stored as "3x per week" (no DB
-                  // change); the stepper picks N, the target stays per session.
+                  // S55: Weekly / Monthly are stored as "3x per week" /
+                  // "2x per month" (no DB change); the stepper picks N, the
+                  // target stays per session.
                   const freq = parseFrequency(field.value);
+                  const maxTimes = freq.kind === "monthly" ? MAX_TIMES_PER_MONTH : MAX_TIMES_PER_WEEK;
                   return (
                     <FormItem>
                       <FormLabel>Frequency</FormLabel>
                       <Select
                         onValueChange={(kind) =>
                           field.onChange(
-                            kind === "weekly"
-                              ? formatFrequency({ kind: "weekly", times: freq.kind === "weekly" ? freq.times : 3 })
+                            kind === "weekly" || kind === "monthly"
+                              ? formatFrequency({
+                                  kind,
+                                  times: freq.kind !== "daily" ? freq.times : kind === "weekly" ? 3 : 2,
+                                })
                               : kind,
                           )
                         }
@@ -627,25 +632,27 @@ export function HabitForm({
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="daily">Daily</SelectItem>
-                          <SelectItem value="weekly">Times per week</SelectItem>
+                          <SelectItem value="weekly">Weekly</SelectItem>
                           <SelectItem value="monthly">Monthly</SelectItem>
                         </SelectContent>
                       </Select>
-                      {freq.kind === "weekly" && (
+                      {freq.kind !== "daily" && (
                         <div className="flex flex-wrap items-center gap-2 pt-1">
                           <NumberStepper
                             min={1}
-                            max={MAX_TIMES_PER_WEEK}
+                            max={maxTimes}
                             value={freq.times}
                             onChange={(v) => {
-                              const n = Math.min(Math.max(Number(v) || 1, 1), MAX_TIMES_PER_WEEK);
-                              field.onChange(formatFrequency({ kind: "weekly", times: n }));
+                              const n = Math.min(Math.max(Number(v) || 1, 1), maxTimes);
+                              field.onChange(formatFrequency({ kind: freq.kind, times: n }));
                             }}
                             className="w-36"
-                            aria-label="Times per week"
+                            aria-label={freq.kind === "weekly" ? "Times per week" : "Times per month"}
                           />
-                          <span className="text-sm text-muted-foreground">× per week, each time the target below</span>
-                          {habit && onWeeklyRewards && (
+                          <span className="text-sm text-muted-foreground">
+                            × a {freq.kind === "weekly" ? "week" : "month"}, each time the target below
+                          </span>
+                          {habit && onWeeklyRewards && freq.kind === "weekly" && (
                             <Button type="button" variant="outline" size="sm" onClick={onWeeklyRewards}>
                               <Gift className="mr-1 h-4 w-4" />
                               Weekly rewards
@@ -1260,7 +1267,9 @@ export function HabitForm({
                     type="button"
                     size="sm"
                     disabled={!newRewardName.trim() || createInlineReward.isPending}
-                    onClick={() => createInlineReward.mutate()}
+                    onClick={() => {
+                      if (allowCreate("rewards", rewards.length)) createInlineReward.mutate();
+                    }}
                   >
                     {createInlineReward.isPending && (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />

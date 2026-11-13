@@ -1,5 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
+import { usePlan } from "@/hooks/use-plan";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -98,6 +99,7 @@ function GoalCard({ goal, dream, subgoals, onEdit, onDelete }: {
 
 export default function GoalsPage() {
   const { user } = useAuth();
+  const { allowCreate } = usePlan();
   const [open, setOpen] = useState(false);
   const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
   const { toast } = useToast();
@@ -181,7 +183,15 @@ export default function GoalsPage() {
         </div>
         <Dialog open={open} onOpenChange={(v) => { if (!v) setSelectedGoal(null); setOpen(v); }}>
           <DialogTrigger asChild>
-            <Button onClick={() => setSelectedGoal(null)}><Plus className="h-4 w-4 mr-2" />Add Goal</Button>
+            <Button
+              onClick={(e) => {
+                setSelectedGoal(null);
+                // Free plan: FREE_LIMITS.goals top-level goals (subgoals don't count).
+                if (!allowCreate("goals", goalsByParent["root"]?.length || 0)) e.preventDefault();
+              }}
+            >
+              <Plus className="h-4 w-4 mr-2" />Add Goal
+            </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>{selectedGoal ? "Edit Goal" : "Add New Goal"}</DialogTitle></DialogHeader>

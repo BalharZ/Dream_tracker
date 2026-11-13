@@ -64,7 +64,7 @@ export function scoreInterval(
     if (v >= target) hits++;
   }
   // Legacy "weekly" = the target is a weekly total; "Nx per week" = N
-  // sessions that each meet the target (S55); monthly = one per ~30 days.
+  // sessions that each meet the target (S55); "Nx per month" = N per ~30 days.
   const freq = habitFrequency(habit);
   const rate =
     habit.frequency === "weekly"
@@ -72,7 +72,7 @@ export function scoreInterval(
       : freq.kind === "weekly"
         ? hits / Math.max(1, (days * freq.times) / 7)
         : freq.kind === "monthly"
-          ? hits / Math.max(1, days / 30)
+          ? hits / Math.max(1, (days * freq.times) / 30)
           : hits / days;
   if (rate >= GROW_RATE) return "up";
   if (rate < SHRINK_RATE) return "down";

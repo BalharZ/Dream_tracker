@@ -14,6 +14,7 @@ import { Reward } from "@shared/schema";
 import { supabase } from "@/lib/supabase";
 import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
+import { usePlan } from "@/hooks/use-plan";
 import { Plus, Loader2, Pencil, Trash2, Library, Image as ImageIcon, X } from "lucide-react";
 import { ImageGallery } from "@/components/images/image-gallery";
 import {
@@ -202,8 +203,9 @@ function RewardCard({ reward, onClick }: { reward: Reward; onClick: () => void }
   );
 }
 
-function BrowseRewardsDialog() {
+function BrowseRewardsDialog({ rewardCount }: { rewardCount: number }) {
   const { user } = useAuth();
+  const { allowCreate } = usePlan();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -234,7 +236,12 @@ function BrowseRewardsDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline">
+        <Button
+          variant="outline"
+          onClick={(e) => {
+            if (!allowCreate("rewards", rewardCount)) e.preventDefault();
+          }}
+        >
           <Library className="h-4 w-4 mr-2" />
           Browse Rewards
         </Button>
@@ -447,6 +454,7 @@ function AddRewardForm({
 
 export default function RewardsPage() {
   const { user } = useAuth();
+  const { allowCreate } = usePlan();
   const [open, setOpen] = useState(false);
   const [selectedReward, setSelectedReward] = useState<Reward | null>(null);
 
@@ -475,10 +483,16 @@ export default function RewardsPage() {
         </div>
 
         <div className="flex flex-col sm:flex-row gap-2">
-          <BrowseRewardsDialog />
+          <BrowseRewardsDialog rewardCount={rewards?.length || 0} />
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button
+                onClick={(e) => {
+                  setSelectedReward(null);
+                  // Free plan: FREE_LIMITS.rewards rewards.
+                  if (!allowCreate("rewards", rewards?.length || 0)) e.preventDefault();
+                }}
+              >
                 <Plus className="h-4 w-4 mr-2" />
                 Add Reward
               </Button>

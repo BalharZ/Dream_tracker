@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Bot, ChevronDown, MessageCircle, PlayCircle, Send, Sparkles, X } from "lucide-react";
+import { Bot, PlayCircle, Send, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -39,8 +39,6 @@ type Draft = {
   habitUnit?: string;
 };
 
-const HIDDEN_KEY = "ns-coach-hidden";
-
 const FAQ: { q: string; a: string }[] = [
   {
     q: "How do habits work?",
@@ -55,8 +53,8 @@ const FAQ: { q: string; a: string }[] = [
     a: "Attach rewards to a habit with a win chance. When you complete the habit, a roulette spins and you may win one. N× per week habits can also have a weekly reward for finishing the whole week.",
   },
   {
-    q: "Weekly habits?",
-    a: "Pick “Times per week” as the frequency — e.g. 3× per week, 1 hour each. A done day is half-coloured until you finish the week, then the whole week fills in.",
+    q: "Weekly or monthly habits?",
+    a: "Pick “Weekly” or “Monthly” as the frequency and set how many times — e.g. 3× a week, 1 hour each. A done day is half-coloured until you reach the count for the week (or month), then the whole period fills in.",
   },
 ];
 
@@ -82,17 +80,11 @@ function parseAmount(text: string): { count: number; unit: string } | null {
   return count > 0 ? { count, unit: m[2].trim() || "times" } : null;
 }
 
-export function CoachChat() {
+/** Opened from the "Coach" item in the navigation (bottom bar / sidebar). */
+export function CoachChat({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const setOpen = onOpenChange;
   const { user } = useAuth();
   const { hasAI, isPro, openPaywall } = usePlan();
-  const [open, setOpen] = useState(false);
-  const [hidden, setHidden] = useState(() => {
-    try {
-      return localStorage.getItem(HIDDEN_KEY) === "1";
-    } catch {
-      return false;
-    }
-  });
   const [messages, setMessages] = useState<Msg[]>([]);
   const [step, setStep] = useState<Step>("menu");
   const [draft, setDraft] = useState<Draft>({});
@@ -109,15 +101,6 @@ export function CoachChat() {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, step]);
 
-  const setHiddenPersist = (v: boolean) => {
-    setHidden(v);
-    try {
-      localStorage.setItem(HIDDEN_KEY, v ? "1" : "0");
-    } catch {
-      // ignore
-    }
-  };
-
   const say = (...msgs: Msg[]) => setMessages((prev) => [...prev, ...msgs]);
   const coach = (text: string): Msg => ({ from: "coach", text });
   const me = (text: string): Msg => ({ from: "user", text });
@@ -131,13 +114,25 @@ export function CoachChat() {
   const startSetup = async () => {
     say(me("Set up my first habit"));
     if (!isPro && user) {
-      const [{ count: dreams }, { count: habits }] = await Promise.all([
-        supabase.from("dreams").select("id", { count: "exact", head: true }).eq("user_id", user.id),
-        supabase.from("habits").select("id", { count: "exact", head: true }).eq("user_id", user.id).is("archived_at", null),
+      // The walkthrough adds one of each, so every kind needs a free slot.
+      const count = (q: PromiseLike<{ count: number | null }>) => q.then((r) => r.count ?? 0);
+      const [dreams, goals, habits, rewards] = await Promise.all([
+        count(supabase.from("dreams").select("id", { count: "exact", head: true }).eq("user_id", user.id)),
+        count(supabase.from("goals").select("id", { count: "exact", head: true }).eq("user_id", user.id).is("parent_goal_id", null)),
+        count(supabase.from("habits").select("id", { count: "exact", head: true }).eq("user_id", user.id).is("archived_at", null)),
+        count(supabase.from("rewards").select("id", { count: "exact", head: true }).eq("user_id", user.id)),
       ]);
-      if ((dreams ?? 0) >= FREE_LIMITS.dreams || (habits ?? 0) >= FREE_LIMITS.habits) {
-        say(coach("You've used all the dreams or habits of the Free plan. Archive a habit, or go Pro for unlimited."));
-        openPaywall((dreams ?? 0) >= FREE_LIMITS.dreams ? "dream-limit" : "habit-limit");
+      const full = (
+        [
+          ["dreams", dreams, "dream-limit"],
+          ["goals", goals, "goal-limit"],
+          ["habits", habits, "habit-limit"],
+          ["rewards", rewards, "reward-limit"],
+        ] as const
+      ).find(([kind, n]) => n >= FREE_LIMITS[kind]);
+      if (full) {
+        say(coach(`You've used all the ${full[0]} of the Free plan. Free is for trying Northstar out — go Pro for unlimited.`));
+        openPaywall(full[2]);
         return;
       }
     }
@@ -276,34 +271,7 @@ export function CoachChat() {
 
   if (!user) return null;
 
-  if (hidden) {
-    return (
-      <button
-        type="button"
-        onClick={() => {
-          setHiddenPersist(false);
-          setOpen(true);
-        }}
-        aria-label="Show coach"
-        className="fixed right-0 bottom-28 z-40 rounded-l-lg border border-r-0 bg-card px-1 py-3 text-primary shadow-md md:bottom-10"
-      >
-        <MessageCircle className="h-4 w-4" />
-      </button>
-    );
-  }
-
-  if (!open) {
-    return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-label="Open coach"
-        className="fixed right-4 bottom-24 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-elevated transition-transform hover:scale-105 md:bottom-6"
-      >
-        <MessageCircle className="h-6 w-6" />
-      </button>
-    );
-  }
+  if (!open) return null;
 
   const chips = (items: string[]) => (
     <div className="flex flex-wrap gap-1.5">
@@ -330,20 +298,7 @@ export function CoachChat() {
           <div className="text-sm font-semibold">Northstar coach</div>
           <div className="text-[11px] text-muted-foreground">{hasAI ? "AI coach arrives soon" : "Guide · AI coach in Pro + AI"}</div>
         </div>
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setOpen(false)} aria-label="Minimise">
-          <ChevronDown className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8"
-          onClick={() => {
-            setOpen(false);
-            setHiddenPersist(true);
-          }}
-          aria-label="Hide coach button"
-          title="Hide (a small tab stays at the screen edge)"
-        >
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setOpen(false)} aria-label="Close coach">
           <X className="h-4 w-4" />
         </Button>
       </div>

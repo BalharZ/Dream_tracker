@@ -1,5 +1,4 @@
 import { useMemo } from "react";
-import { Dumbbell } from "lucide-react";
 import type { Habit } from "@shared/schema";
 import type { ValuesByDate } from "@/lib/streaks";
 import { ProgressRing } from "@/components/ui/progress-ring";
@@ -18,7 +17,8 @@ export function StrengthChip({ habit, values }: { habit: Habit; values: ValuesBy
       className="flex-shrink-0 flex items-center gap-0.5 rounded-full px-1 py-0.5 text-[10px] font-semibold leading-none"
       style={{ color: habit.color, backgroundColor: `${habit.color}1f` }}
     >
-      <Dumbbell className="h-3 w-3" />
+      {/* A tiny ring, not an icon: a dumbbell read as a "gym habit" icon (owner). */}
+      <ProgressRing value={s} color={habit.color} size={11} stroke={2.5} trackColor={`${habit.color}40`} />
       {pct(s)}
     </span>
   );

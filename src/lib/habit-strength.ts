@@ -73,8 +73,8 @@ export function habitStrength(habit: Habit, values: ValuesByDate, today: Date = 
     return s;
   }
 
-  // Weekly (N per Mon..Sun week) or monthly (1 per calendar month).
-  const times = freq.kind === "weekly" ? freq.times : 1;
+  // Weekly (N per Mon..Sun week) or monthly (N per calendar month).
+  const times = freq.times;
   let periodStart = freq.kind === "weekly" ? weekStart(start) : new Date(start.getFullYear(), start.getMonth(), 1);
   while (periodStart <= end) {
     const periodEnd =
