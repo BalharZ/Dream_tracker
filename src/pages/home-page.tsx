@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/lib/supabase";
 import { TodayHabits } from "@/components/habits/today-habits";
+import { WeekReviewCard } from "@/components/habits/week-review-card";
 import { QuickRewards } from "@/components/rewards/quick-rewards";
 import { DreamShowcase } from "@/components/dreams/dream-showcase";
 import type { Dream } from "@shared/schema";
@@ -29,6 +30,8 @@ export default function HomePage() {
       </div>
 
       <TodayHabits />
+
+      <WeekReviewCard />
 
       <QuickRewards />
 

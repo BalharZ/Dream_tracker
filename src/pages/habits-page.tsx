@@ -66,8 +66,8 @@ function HabitsPage() {
   // Native app only: keep the on-device daily reminders in sync with the
   // habits that want one (covers reinstall and edits from other devices).
   useEffect(() => {
-    if (habits) syncHabitReminders(habits);
-  }, [habits]);
+    if (habits) syncHabitReminders(habits, { weeklyReview: isPro });
+  }, [habits, isPro]);
 
   useEffect(() => {
     if (!habits || habits.length === 0) return;

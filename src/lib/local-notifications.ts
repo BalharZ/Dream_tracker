@@ -405,7 +405,10 @@ export async function cancelHabitReminder(habitId: number): Promise<void> {
  * devices, and — importantly — so the rolling buffer of exact one-shot
  * notifications is topped up before it runs out.
  */
-export async function syncHabitReminders(habits: Habit[]): Promise<void> {
+export async function syncHabitReminders(
+  habits: Habit[],
+  options: { weeklyReview?: boolean } = {},
+): Promise<void> {
   if (!isNativeApp()) return;
   try {
     const pending = await LocalNotifications.getPending();
@@ -436,6 +439,7 @@ export async function syncHabitReminders(habits: Habit[]): Promise<void> {
         await scheduleOne(habit, contentMap.get(habit.id));
       }
       await syncStreakSavers(habits);
+      await syncWeeklyReview(!!options.weeklyReview && habits.some((h) => !h.archived_at));
     }
   } catch (err) {
     console.error("Syncing local notifications failed:", err);
@@ -487,6 +491,32 @@ async function syncStreakSavers(habits: Habit[]): Promise<void> {
     });
   }
   if (notifications.length) await LocalNotifications.schedule({ notifications });
+}
+
+/* ------------------------------------------- S61b: weekly review (Pro) */
+
+// Sunday evening nudge to open the weekly review card on the Dashboard. The
+// text carries no numbers: it's laid down days ahead, so counts would be stale.
+const WEEKLY_REVIEW_ID = 8_999_999;
+const WEEKLY_REVIEW_HOUR = 19;
+
+async function syncWeeklyReview(enabled: boolean): Promise<void> {
+  await LocalNotifications.cancel({ notifications: [{ id: WEEKLY_REVIEW_ID }] });
+  if (!enabled) return;
+  const at = new Date();
+  at.setHours(WEEKLY_REVIEW_HOUR, 0, 0, 0);
+  at.setDate(at.getDate() + ((7 - at.getDay()) % 7)); // next Sunday (or today)
+  if (at.getTime() <= Date.now()) at.setDate(at.getDate() + 7);
+  await LocalNotifications.schedule({
+    notifications: [
+      {
+        id: WEEKLY_REVIEW_ID,
+        title: "🗓️ Your weekly review is ready",
+        body: "See which habits carried your week and what to focus on next.",
+        schedule: { at, allowWhileIdle: true },
+      },
+    ],
+  });
 }
 
 function localDayKey(d: Date): string {

@@ -539,7 +539,10 @@ Detail viz `docs/NAMING.md` (sekce „Provedeno"). Viditelný název → Northst
   4. **Nové APK** (`public/DreamTracker.apk`): přijímač střídá obrázky sám, i když se appka týden neotevře. Staré APK přepne obrázek jen při otevření appky.
   *Majitel:* spustit `supabase/sql/S72_dream_negative_image.sql` (bez něj nejde negativní obrázek uložit, zbytek appky funguje). Nainstalovat nové APK.
   *Ověřeno:* `tsc`, `vite build`, `gradlew assembleDebug`, náhled 375 px (Coach stránka bez přetečení, formulář snu s náhledem negativního obrázku), výpočet střídání v prohlížeči. Notifikaci na telefonu neověřeno.
-- [ ] **S61b Chytré připomínky Pro** — víc připomínek denně, adaptivní čas, nedělní souhrn. Pozn.: kontrola splnění v okamžiku zazvonění vyžaduje úpravu nativního pluginu → nové APK.
+- [~] **S61b Chytré připomínky Pro** — částečně ✅ 2026-11-13:
+  - ✅ **Týdenní souhrn:** karta na Dashboardu v neděli (tento týden) a v pondělí (minulý týden): % splněných dnů, pruh u každého zvyku, „Carried your week“ a „Focus this week“. Ve Free je rozmazaná se zámkem. Pro dostane v neděli v 19:00 notifikaci. Měsíční zvyky se nepočítají.
+  - ⏳ **Víc připomínek denně:** potřebuje nový sloupec v tabulce `habits` (SQL od majitele) a úpravu formuláře.
+  - ⏳ **Adaptivní čas:** appka neukládá, v kolik hodin se zvyk splnil, takže zatím není z čeho počítat. Nejdřív začít ukládat čas zápisu (SQL), pak za pár týdnů navrhovat čas.
 - [x] **S62 Právní texty** ✅ 2026-10-30 — `public/privacy.html`, `public/terms.html`, odkazy v Nastavení.
   *Majitel:* doplnit žlutá pole [TODO] (firma, IČO, adresa, e-mail, region Supabase) a nechat zkontrolovat.
 - [ ] **S63 Ochrana proti klonování** — odloženo do S64/S66: má smysl, až budou AI a platby na serveru (Edge Functions + RLS). Pak doplnit obfuskaci buildu a Play Integrity.

@@ -27,7 +27,7 @@ const HEADLINES: Record<PaywallReason, { title: string; text: string }> = {
   export: { title: "Beautiful exports", text: "Pro exports to Excel and PDF reports, with automatic backups you can restore." },
   "ai-coach": { title: "Meet your AI coach", text: "Break dreams into goals, plan your week and get a weekly review — with Pro + AI." },
   "ai-images": { title: "Picture your dream", text: "Generate images of your dream — even you, at your goal — with Pro + AI." },
-  reminders: { title: "Smarter reminders", text: "Motivational reminders, several a day and at the time you usually act — with Pro." },
+  reminders: { title: "Smarter reminders", text: "A weekly review of your habits every Sunday, plus motivational reminders — with Pro." },
   upgrade: { title: "Go further with Northstar Pro", text: "Unlimited dreams, goals, habits and rewards, full stats, exports — and an AI coach." },
 };
 

@@ -12,6 +12,7 @@ import { supabase } from "@/lib/supabase";
 import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import { usePlan } from "@/hooks/use-plan";
 import { recomputeProgress } from "@/lib/progress";
 import { applySnowballGrowth } from "@/lib/snowball";
 import { syncHabitReminders } from "@/lib/local-notifications";
@@ -27,6 +28,7 @@ import { RewardRoulette } from "@/components/habits/reward-roulette";
 export function TodayHabits() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { isPro } = usePlan();
   const today = new Date();
   const dateStr = format(today, "yyyy-MM-dd");
 
@@ -149,8 +151,8 @@ export function TodayHabits() {
   // dashboard is the landing page, so this keeps reminders fresh even if the
   // user never opens the Habits page.
   useEffect(() => {
-    if (habits) syncHabitReminders(habits);
-  }, [habits]);
+    if (habits) syncHabitReminders(habits, { weeklyReview: isPro });
+  }, [habits, isPro]);
 
   // Local, editable copy of today's values keyed by habit id.
   const [values, setValues] = useState<Record<number, number | string>>({});
