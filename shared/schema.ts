@@ -5,6 +5,8 @@ export type Dream = {
   image: string;
   positive_motivation: string | null;
   negative_motivation: string | null;
+  // S72: "opposite of the dream" image for reminders after a missed period.
+  negative_image: string | null;
   progress: number;
   is_demo: boolean;
   created_at: string;

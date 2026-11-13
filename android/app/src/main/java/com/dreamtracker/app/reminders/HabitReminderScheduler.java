@@ -26,6 +26,30 @@ public class HabitReminderScheduler {
     public static final String EXTRA_IMAGE_PATH = "imagePath";
     public static final String EXTRA_HOUR = "hour";
     public static final String EXTRA_MINUTE = "minute";
+    // S72: alternate (positive/negative) content the receiver switches to per
+    // day once the habit counts as neglected (negFrom, local midnight millis).
+    public static final String EXTRA_ALT_BODY = "altBody";
+    public static final String EXTRA_ALT_IMAGE = "altImageUrl";
+    public static final String EXTRA_ALT_IMAGE_PATH = "altImagePath";
+    public static final String EXTRA_NEG_FROM = "negFromMillis";
+    public static final String EXTRA_BASE_NEG = "baseIsNegative";
+
+    /** S72 alternate content for one reminder. */
+    public static class Alt {
+        public final String body;
+        public final String imageUrl;
+        public final String imagePath;
+        public final long negFromMillis;
+        public final boolean baseIsNegative;
+
+        public Alt(String body, String imageUrl, String imagePath, long negFromMillis, boolean baseIsNegative) {
+            this.body = body;
+            this.imageUrl = imageUrl;
+            this.imagePath = imagePath;
+            this.negFromMillis = negFromMillis;
+            this.baseIsNegative = baseIsNegative;
+        }
+    }
 
     private static int piFlags(int base) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -49,7 +73,7 @@ public class HabitReminderScheduler {
     }
 
     private static PendingIntent buildPendingIntent(Context ctx, int id, int flags,
-            String title, String body, String imageUrl, String imagePath, int hour, int minute) {
+            String title, String body, String imageUrl, String imagePath, int hour, int minute, Alt alt) {
         Intent i = new Intent(ctx, HabitReminderReceiver.class);
         i.putExtra(EXTRA_ID, id);
         i.putExtra(EXTRA_TITLE, title);
@@ -58,16 +82,29 @@ public class HabitReminderScheduler {
         i.putExtra(EXTRA_IMAGE_PATH, imagePath);
         i.putExtra(EXTRA_HOUR, hour);
         i.putExtra(EXTRA_MINUTE, minute);
+        if (alt != null) {
+            i.putExtra(EXTRA_ALT_BODY, alt.body);
+            i.putExtra(EXTRA_ALT_IMAGE, alt.imageUrl);
+            i.putExtra(EXTRA_ALT_IMAGE_PATH, alt.imagePath);
+            i.putExtra(EXTRA_NEG_FROM, alt.negFromMillis);
+            i.putExtra(EXTRA_BASE_NEG, alt.baseIsNegative);
+        }
         return PendingIntent.getBroadcast(ctx, id, i, piFlags(flags));
     }
 
     /** Schedule an exact wake-up alarm for one habit. */
     public static void scheduleExact(Context ctx, int id, long atMillis,
             String title, String body, String imageUrl, String imagePath, int hour, int minute) {
+        scheduleExact(ctx, id, atMillis, title, body, imageUrl, imagePath, hour, minute, null);
+    }
+
+    /** Same, with S72 alternate content (alt may be null). */
+    public static void scheduleExact(Context ctx, int id, long atMillis,
+            String title, String body, String imageUrl, String imagePath, int hour, int minute, Alt alt) {
         AlarmManager am = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
         if (am == null) return;
         PendingIntent pi = buildPendingIntent(
-            ctx, id, PendingIntent.FLAG_UPDATE_CURRENT, title, body, imageUrl, imagePath, hour, minute);
+            ctx, id, PendingIntent.FLAG_UPDATE_CURRENT, title, body, imageUrl, imagePath, hour, minute, alt);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             try {
                 am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, atMillis, pi);
@@ -78,6 +115,23 @@ public class HabitReminderScheduler {
         } else {
             am.setExact(AlarmManager.RTC_WAKEUP, atMillis, pi);
         }
+    }
+
+    /**
+     * S72: negative content on the first neglected day, then every other day
+     * (mirrors negativeOn() in src/lib/local-notifications.ts).
+     */
+    public static boolean negativeOn(long nowMillis, long negFromMillis) {
+        if (negFromMillis <= 0 || nowMillis < negFromMillis) return false;
+        java.util.Calendar day = java.util.Calendar.getInstance();
+        day.setTimeInMillis(nowMillis);
+        day.set(java.util.Calendar.HOUR_OF_DAY, 0);
+        day.set(java.util.Calendar.MINUTE, 0);
+        day.set(java.util.Calendar.SECOND, 0);
+        day.set(java.util.Calendar.MILLISECOND, 0);
+        // Round: a DST change makes one day 23 or 25 hours long.
+        long days = Math.round((day.getTimeInMillis() - negFromMillis) / 86400000.0);
+        return days % 2 == 0;
     }
 
     /** Cancel a habit's pending alarm (does not clear an already-shown notification). */

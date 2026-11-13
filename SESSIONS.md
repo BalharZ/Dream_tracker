@@ -532,6 +532,13 @@ Detail viz `docs/NAMING.md` (sekce „Provedeno"). Viditelný název → Northst
   4. **Síla zvyku:** ikona činky nahrazena malým prstencem (činka vypadala jako ikona posilovny u každého zvyku).
   5. **Limity Free:** 2 sny, 4 hlavní cíle, 3 odměny, 3 aktivní zvyky (`FREE_LIMITS`); paywall i u cílů a odměn (Add, Browse, nová odměna ve formuláři zvyku), průvodce v chatu hlídá všechny čtyři.
   *Ověřeno:* `tsc`, `vite build`, dočasný náhled s falešnými daty (375 px): řádky 56/56 px na obou stranách, Coach v menu otevře/zavře chat, formulář ukazuje Monthly 2×. Přihlášenou appku musí projít majitel.
+- [x] **S72 Coach jako stránka + negativní obrázek snu** ✅ 2026-11-13
+  1. **Coach** je normální podstránka `/coach` (položka v menu vpravo od Habits), chat vyplní stránku mezi horní lištou a menu, posouvá se jen seznam zpráv. Žádný pop-up.
+  2. **Dreams → Negative Motivation Image:** druhý obrázek snu („opak snu“, např. AI obrázek sebe v horší formě), výběr stejně jako Dream Image.
+  3. **Notifikace:** když zvyk snu nemá žádný záznam celý týden (denní i N× týdně) nebo celý měsíc (měsíční), ukáže se negativní obrázek + negativní motivace. Pak se střídá ob den s pozitivním, aby tam nebyl pořád. Po prvním záznamu se vrací pozitivní. Bez negativního obrázku zůstává obrázek snu (text se střídá, pokud je vyplněná negativní motivace). Nový zvyk se počítá od data vytvoření.
+  4. **Nové APK** (`public/DreamTracker.apk`): přijímač střídá obrázky sám, i když se appka týden neotevře. Staré APK přepne obrázek jen při otevření appky.
+  *Majitel:* spustit `supabase/sql/S72_dream_negative_image.sql` (bez něj nejde negativní obrázek uložit, zbytek appky funguje). Nainstalovat nové APK.
+  *Ověřeno:* `tsc`, `vite build`, `gradlew assembleDebug`, náhled 375 px (Coach stránka bez přetečení, formulář snu s náhledem negativního obrázku), výpočet střídání v prohlížeči. Notifikaci na telefonu neověřeno.
 - [ ] **S61b Chytré připomínky Pro** — víc připomínek denně, adaptivní čas, nedělní souhrn. Pozn.: kontrola splnění v okamžiku zazvonění vyžaduje úpravu nativního pluginu → nové APK.
 - [x] **S62 Právní texty** ✅ 2026-10-30 — `public/privacy.html`, `public/terms.html`, odkazy v Nastavení.
   *Majitel:* doplnit žlutá pole [TODO] (firma, IČO, adresa, e-mail, region Supabase) a nechat zkontrolovat.

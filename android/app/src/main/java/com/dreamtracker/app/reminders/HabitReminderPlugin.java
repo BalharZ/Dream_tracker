@@ -40,13 +40,21 @@ public class HabitReminderPlugin extends Plugin {
                 final String imageUrl = n.optString("imageUrl", "");
                 int hour = n.optInt("hour", 8);
                 int minute = n.optInt("minute", 0);
+                // S72: optional alternate content (sent by newer web builds).
+                final String altImageUrl = n.optString("altImageUrl", "");
+                long negFrom = n.optLong("negFromMillis", 0);
+                final File altImageFile = ReminderImages.cacheFile(getContext(), id + "_alt");
+                HabitReminderScheduler.Alt alt = negFrom > 0 && n.has("altBody")
+                    ? new HabitReminderScheduler.Alt(n.optString("altBody", ""), altImageUrl,
+                        altImageFile.getAbsolutePath(), negFrom, n.optBoolean("baseIsNegative", false))
+                    : null;
 
                 // Pre-cache the image to a stable local file now, so the receiver
                 // just reads it from disk at fire time (no network wait).
                 final File imageFile = ReminderImages.cacheFile(getContext(), id);
                 HabitReminderScheduler.scheduleExact(
                     getContext(), id, atMillis, title, body, imageUrl,
-                    imageFile.getAbsolutePath(), hour, minute);
+                    imageFile.getAbsolutePath(), hour, minute, alt);
 
                 if (ReminderImages.isHttp(imageUrl)) {
                     new Thread(new Runnable() {
@@ -58,6 +66,16 @@ public class HabitReminderPlugin extends Plugin {
                 } else if (imageFile.exists()) {
                     // Image was removed → drop the stale cache.
                     imageFile.delete();
+                }
+                if (alt != null && ReminderImages.isHttp(altImageUrl)) {
+                    new Thread(new Runnable() {
+                        @Override
+                        public void run() {
+                            ReminderImages.download(altImageUrl, altImageFile);
+                        }
+                    }).start();
+                } else if (altImageFile.exists()) {
+                    altImageFile.delete();
                 }
             }
             call.resolve();

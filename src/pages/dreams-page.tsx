@@ -21,6 +21,9 @@ type Dream = {
   image: string;
   positive_motivation: string | null;
   negative_motivation: string | null;
+  // S72: the "opposite of the dream" picture, shown in reminders after a
+  // week (month for monthly habits) with no progress. Needs S72 SQL.
+  negative_image?: string | null;
   progress: number;
   created_at: string;
 };
@@ -113,18 +116,22 @@ export default function DreamsPage() {
 
 function AddDreamForm({ dream, onSuccess, onDelete }: { dream?: Dream | null; onSuccess: () => void; onDelete?: () => void }) {
   const { user } = useAuth();
-  const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const form = useForm({
     defaultValues: {
       name: dream?.name || "",
       image: dream?.image || "",
       positive_motivation: dream?.positive_motivation || "",
       negative_motivation: dream?.negative_motivation || "",
+      negative_image: dream?.negative_image || "",
     },
   });
 
   const createDream = useMutation({
-    mutationFn: async (values: any) => {
+    mutationFn: async (raw: any) => {
+      // Only send negative_image when it's set (or being cleared), so saving
+      // a dream keeps working before the S72 column exists.
+      const values = { ...raw };
+      if (!values.negative_image && !dream?.negative_image) delete values.negative_image;
       if (dream) {
         const { error } = await supabase.from("dreams").update(values).eq("id", dream.id);
         if (error) throw error;
@@ -140,10 +147,6 @@ function AddDreamForm({ dream, onSuccess, onDelete }: { dream?: Dream | null; on
       onSuccess();
     },
   });
-
-  const handleImageSelect = (imageUrl: string) => {
-    form.setValue("image", imageUrl);
-  };
 
   return (
     <Form {...form}>
@@ -171,53 +174,12 @@ function AddDreamForm({ dream, onSuccess, onDelete }: { dream?: Dream | null; on
           control={form.control}
           name="image"
           render={({ field }) => (
-            <FormItem>
-              <FormLabel>Dream Image</FormLabel>
-              <div className="flex gap-2">
-                <FormControl>
-                  <Input
-                    placeholder="Enter an image URL or select from gallery"
-                    {...field}
-                  />
-                </FormControl>
-                {field.value && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => form.setValue("image", "")}
-                    title="Clear image"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                )}
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setIsGalleryOpen(true)}
-                >
-                  <ImageIcon className="h-4 w-4" />
-                </Button>
-              </div>
-              <FormDescription>
-                Select an image that represents your dream
-              </FormDescription>
-
-              {field.value && (
-                <div className="mt-2">
-                  <div className="w-full max-w-[240px] aspect-square rounded-md overflow-hidden border bg-muted flex items-center justify-center">
-                    <img src={field.value} alt="Dream preview" className="w-full h-full object-contain" />
-                  </div>
-                </div>
-              )}
-
-              <ImageGallery
-                isOpen={isGalleryOpen}
-                setIsOpen={setIsGalleryOpen}
-                onSelect={handleImageSelect}
-              />
-            </FormItem>
+            <ImageField
+              label="Dream Image"
+              description="Select an image that represents your dream"
+              value={field.value}
+              onChange={field.onChange}
+            />
           )}
         />
 
@@ -253,6 +215,19 @@ function AddDreamForm({ dream, onSuccess, onDelete }: { dream?: Dream | null; on
           )}
         />
 
+        <FormField
+          control={form.control}
+          name="negative_image"
+          render={({ field }) => (
+            <ImageField
+              label="Negative Motivation Image"
+              description="The opposite of your dream. Reminders show it, taking turns with the dream image, when a habit for this dream gets no progress for a week (a month for monthly habits)."
+              value={field.value}
+              onChange={field.onChange}
+            />
+          )}
+        />
+
         <div className="flex gap-2">
           <Button
             type="submit"
@@ -277,5 +252,53 @@ function AddDreamForm({ dream, onSuccess, onDelete }: { dream?: Dream | null; on
         </div>
       </form>
     </Form>
+  );
+}
+
+/** URL input + gallery picker + square preview, used for both dream images. */
+function ImageField({
+  label,
+  description,
+  value,
+  onChange,
+}: {
+  label: string;
+  description: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [isGalleryOpen, setIsGalleryOpen] = useState(false);
+  return (
+    <FormItem>
+      <FormLabel>{label}</FormLabel>
+      <div className="flex gap-2">
+        <FormControl>
+          <Input
+            placeholder="Enter an image URL or select from gallery"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+          />
+        </FormControl>
+        {value && (
+          <Button type="button" variant="outline" size="icon" onClick={() => onChange("")} title="Clear image">
+            <X className="h-4 w-4" />
+          </Button>
+        )}
+        <Button type="button" variant="outline" size="icon" onClick={() => setIsGalleryOpen(true)}>
+          <ImageIcon className="h-4 w-4" />
+        </Button>
+      </div>
+      <FormDescription>{description}</FormDescription>
+
+      {value && (
+        <div className="mt-2">
+          <div className="w-full max-w-[240px] aspect-square rounded-md overflow-hidden border bg-muted flex items-center justify-center">
+            <img src={value} alt={`${label} preview`} className="w-full h-full object-contain" />
+          </div>
+        </div>
+      )}
+
+      <ImageGallery isOpen={isGalleryOpen} setIsOpen={setIsGalleryOpen} onSelect={onChange} />
+    </FormItem>
   );
 }

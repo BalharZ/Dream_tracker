@@ -1,4 +1,5 @@
 import { Capacitor, registerPlugin } from "@capacitor/core";
+import { addDays, addMonths, differenceInCalendarDays, format, startOfDay } from "date-fns";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { supabase } from "@/lib/supabase";
 import type { Habit } from "@shared/schema";
@@ -19,6 +20,13 @@ type NativeReminder = {
   imageUrl: string;
   hour: number;
   minute: number;
+  // S72 (APK with the alternating receiver; older APKs ignore these and keep
+  // showing title/body/imageUrl): from negFromMillis on, the receiver picks per
+  // day between the base content and the alt one, see negativeOn().
+  altBody?: string;
+  altImageUrl?: string;
+  negFromMillis?: number;
+  baseIsNegative?: boolean;
 };
 interface HabitReminderPlugin {
   schedule(options: { notifications: NativeReminder[] }): Promise<void>;
@@ -132,7 +140,58 @@ type HabitContent = {
   negative: string | null;
   dreamName: string | null;
   image: string | null;
+  // S72: the dream's "opposite" picture and the moment the habit counts as
+  // neglected (null = never, e.g. nothing negative to show).
+  negativeImage: string | null;
+  negativeFrom: Date | null;
 };
+
+/* ------------------------------------------- S72: negative motivation */
+
+// A habit with no progress at all for a whole week (a month for monthly
+// habits) gets the negative motivation — taking turns day by day with the
+// positive one, so a long break doesn't mean the same grim picture every day.
+const NEGLECT_LOOKBACK_DAYS = 62;
+
+/** First moment the habit counts as neglected if nothing is logged after `lastActive`. */
+export function neglectStart(habit: Pick<Habit, "frequency">, lastActive: Date): Date {
+  const day = startOfDay(lastActive);
+  const grace = habitFrequency(habit).kind === "monthly" ? addMonths(day, 1) : addDays(day, 7);
+  return addDays(grace, 1);
+}
+
+/** Negative on the first neglected day, then every other day. */
+export function negativeOn(day: Date, negativeFrom: Date | null): boolean {
+  if (!negativeFrom || day < negativeFrom) return false;
+  return differenceInCalendarDays(day, negativeFrom) % 2 === 0;
+}
+
+function negativeBody(content: HabitContent, habit: Habit): string {
+  const period = habitFrequency(habit).kind === "monthly" ? "a month" : "a week";
+  return [
+    `⚠️ ${content.negative || "Your dream is slipping away."}`,
+    `Nothing done for ${period}. One small step today turns it around.`,
+  ].join("\n");
+}
+
+/** Day of the last logged progress per habit (value > 0), from the last ~2 months. */
+async function lastActiveDays(habits: Habit[]): Promise<Map<number, Date>> {
+  const map = new Map<number, Date>();
+  if (habits.length === 0) return map;
+  const since = format(addDays(new Date(), -NEGLECT_LOOKBACK_DAYS), "yyyy-MM-dd");
+  const { data } = await supabase
+    .from("habit_progress")
+    .select("habit_id, date, value")
+    .in("habit_id", habits.map((h) => h.id))
+    .gt("value", 0)
+    .gte("date", since);
+  for (const p of data || []) {
+    const d = new Date(`${p.date}T00:00:00`);
+    const prev = map.get(p.habit_id);
+    if (!prev || d > prev) map.set(p.habit_id, d);
+  }
+  return map;
+}
 
 function notificationBody(content: HabitContent | undefined): string {
   const lines = [
@@ -172,24 +231,33 @@ async function resolveContent(habits: Habit[]): Promise<Map<number, HabitContent
       image: string | null;
       positive_motivation: string | null;
       negative_motivation: string | null;
+      negative_image?: string | null;
     }
   >();
   if (dreamIds.length) {
-    const { data } = await supabase
-      .from("dreams")
-      .select("id, name, image, positive_motivation, negative_motivation")
-      .in("id", dreamIds);
+    // "*" rather than a column list: negative_image only exists after the S72
+    // SQL, and naming a missing column would break every reminder.
+    const { data } = await supabase.from("dreams").select("*").in("id", dreamIds);
     for (const d of data || []) dreamById.set(d.id, d);
   }
 
+  const lastActive = await lastActiveDays(habits);
   for (const h of habits) {
     const goal = h.goal_id != null ? goalById.get(h.goal_id) : undefined;
     const dream = goal ? dreamById.get(goal.dream_id) : undefined;
+    const negative = dream?.negative_motivation || h.negative_motivation;
+    const negativeImage = dream?.negative_image || null;
+    // A brand-new habit isn't neglected: count from its creation at the latest.
+    const created = new Date(h.created_at);
+    const active = lastActive.get(h.id);
+    const since = active && active > created ? active : created;
     map.set(h.id, {
       positive: dream?.positive_motivation || h.positive_motivation,
-      negative: dream?.negative_motivation || h.negative_motivation,
+      negative,
       dreamName: dream?.name ?? null,
       image: dream?.image || h.image || null,
+      negativeImage,
+      negativeFrom: negative || negativeImage ? neglectStart(h, since) : null,
     });
   }
   return map;
@@ -214,13 +282,14 @@ function buildHabitNotifications(habit: Habit, content: HabitContent | undefined
   const base = habit.id * 100;
   const now = Date.now();
   const title = reminderTitle(habit);
-  const body = notificationBody(content);
   const notifications = [];
   for (let i = 0; i < REMINDER_DAYS; i++) {
     const at = new Date();
     at.setHours(hour, minute, 0, 0);
     at.setDate(at.getDate() + i);
     if (at.getTime() <= now) continue; // today's slot already passed
+    const body =
+      content && negativeOn(at, content.negativeFrom) ? negativeBody(content, habit) : notificationBody(content);
     notifications.push({
       id: base + i,
       title,
@@ -246,6 +315,17 @@ async function scheduleOne(habit: Habit, content: HabitContent | undefined): Pro
     const at = new Date();
     at.setHours(hour, minute, 0, 0);
     if (at.getTime() <= Date.now()) at.setDate(at.getDate() + 1);
+    // S72: base = what the next reminder should show (all an older APK ever
+    // shows until the next sync); alt = the other side, for the newer
+    // receiver to alternate with on its own while the app stays closed.
+    const positive = { body: notificationBody(content), imageUrl: content?.image || "" };
+    const negativeFrom = content?.negativeFrom ?? null;
+    const negative =
+      content && negativeFrom
+        ? { body: negativeBody(content, habit), imageUrl: content.negativeImage || content.image || "" }
+        : null;
+    const baseIsNegative = !!negative && negativeOn(at, negativeFrom);
+    const [base, alt] = baseIsNegative ? [negative!, positive] : [positive, negative];
     try {
       await HabitReminder.schedule({
         notifications: [
@@ -253,10 +333,17 @@ async function scheduleOne(habit: Habit, content: HabitContent | undefined): Pro
             id: habit.id,
             atMillis: at.getTime(),
             title: reminderTitle(habit),
-            body: notificationBody(content),
-            imageUrl: content?.image || "",
+            body: base.body,
+            imageUrl: base.imageUrl,
             hour,
             minute,
+            ...(alt &&
+              negativeFrom && {
+                altBody: alt.body,
+                altImageUrl: alt.imageUrl,
+                negFromMillis: negativeFrom.getTime(),
+                baseIsNegative,
+              }),
           },
         ],
       });

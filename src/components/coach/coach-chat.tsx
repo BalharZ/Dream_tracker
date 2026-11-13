@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Bot, PlayCircle, Send, Sparkles, X } from "lucide-react";
+import { Bot, PlayCircle, Send, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -80,25 +80,26 @@ function parseAmount(text: string): { count: number; unit: string } | null {
   return count > 0 ? { count, unit: m[2].trim() || "times" } : null;
 }
 
-/** Opened from the "Coach" item in the navigation (bottom bar / sidebar). */
-export function CoachChat({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
-  const setOpen = onOpenChange;
+/** The /coach page, opened from "Coach" in the navigation (bottom bar / sidebar). */
+export function CoachChat() {
   const { user } = useAuth();
   const { hasAI, isPro, openPaywall } = usePlan();
   const [messages, setMessages] = useState<Msg[]>([]);
   const [step, setStep] = useState<Step>("menu");
   const [draft, setDraft] = useState<Draft>({});
   const [input, setInput] = useState("");
-  const endRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (open && messages.length === 0) {
+    if (messages.length === 0) {
       setMessages([{ from: "coach", text: "Hi! I'm your Northstar coach. What would you like to do?" }]);
     }
-  }, [open, messages.length]);
+  }, [messages.length]);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    // Scroll only the message list — scrollIntoView would also move the page.
+    const list = listRef.current;
+    list?.scrollTo({ top: list.scrollHeight, behavior: "smooth" });
   }, [messages, step]);
 
   const say = (...msgs: Msg[]) => setMessages((prev) => [...prev, ...msgs]);
@@ -271,8 +272,6 @@ export function CoachChat({ open, onOpenChange }: { open: boolean; onOpenChange:
 
   if (!user) return null;
 
-  if (!open) return null;
-
   const chips = (items: string[]) => (
     <div className="flex flex-wrap gap-1.5">
       {items.map((t) => (
@@ -291,24 +290,23 @@ export function CoachChat({ open, onOpenChange }: { open: boolean; onOpenChange:
   const typing = ["dream", "goal", "goal-amount", "habit", "habit-amount", "reward"].includes(step);
 
   return (
-    <div className="fixed inset-x-2 bottom-20 z-50 flex h-[min(560px,75dvh)] flex-col overflow-hidden rounded-2xl border bg-background shadow-elevated md:inset-x-auto md:right-6 md:bottom-6 md:w-[380px]">
-      <div className="flex items-center gap-2 border-b px-3 py-2">
-        <Bot className="h-5 w-5 text-primary" />
+    // Fills the screen between the top bar and the bottom navigation, so only
+    // the message list scrolls (12rem = main's mobile top + bottom padding).
+    <div className="flex h-[calc(100dvh-12rem)] flex-col overflow-hidden rounded-2xl border bg-card shadow-sm md:h-[calc(100dvh-4rem)]">
+      <div className="flex items-center gap-2 border-b px-4 py-3">
+        <Bot className="h-6 w-6 text-primary" />
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold">Northstar coach</div>
-          <div className="text-[11px] text-muted-foreground">{hasAI ? "AI coach arrives soon" : "Guide · AI coach in Pro + AI"}</div>
+          <h1 className="text-lg font-bold leading-tight">Coach</h1>
+          <div className="text-xs text-muted-foreground">{hasAI ? "AI coach arrives soon" : "Guide · AI coach in Pro + AI"}</div>
         </div>
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setOpen(false)} aria-label="Close coach">
-          <X className="h-4 w-4" />
-        </Button>
       </div>
 
-      <div className="flex-1 space-y-2 overflow-y-auto px-3 py-3">
+      <div ref={listRef} className="flex-1 space-y-2 overflow-y-auto px-3 py-3 md:px-6">
         {messages.map((m, i) => (
           <div key={i} className={cn("flex", m.from === "user" ? "justify-end" : "justify-start")}>
             <div
               className={cn(
-                "max-w-[85%] whitespace-pre-line rounded-2xl px-3 py-2 text-sm",
+                "max-w-[85%] md:max-w-[70%] whitespace-pre-line rounded-2xl px-3 py-2 text-sm",
                 m.from === "user" ? "bg-primary text-primary-foreground" : "bg-muted",
               )}
             >
@@ -318,7 +316,7 @@ export function CoachChat({ open, onOpenChange }: { open: boolean; onOpenChange:
         ))}
 
         {step === "menu" && (
-          <div className="space-y-1.5 pt-1">
+          <div className="max-w-xl space-y-1.5 pt-1">
             <button
               type="button"
               onClick={startSetup}
@@ -345,7 +343,7 @@ export function CoachChat({ open, onOpenChange }: { open: boolean; onOpenChange:
             </button>
             {/* Demo video slot: drop the recorded clip at public/coach-demo.mp4. */}
             {messages.some((m) => m.text.startsWith("With Pro + AI")) && (
-              <div className="space-y-2 rounded-xl border p-2">
+              <div className="max-w-xl space-y-2 rounded-xl border p-2">
                 <video src="/coach-demo.mp4" controls playsInline className="w-full rounded-lg bg-muted" poster="/icons/icon-512.png">
                   <span className="flex items-center gap-1 text-xs text-muted-foreground">
                     <PlayCircle className="h-4 w-4" /> Demo video coming soon
@@ -387,22 +385,21 @@ export function CoachChat({ open, onOpenChange }: { open: boolean; onOpenChange:
             Back to menu
           </Button>
         )}
-        <div ref={endRef} />
       </div>
 
       {typing && (
         <form
-          className="flex gap-2 border-t p-2"
+          className="flex gap-2 border-t p-2 md:p-3"
           onSubmit={(e) => {
             e.preventDefault();
             answer(input);
           }}
         >
-          <Input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Type or pick above…" className="h-9" />
-          <Button type="submit" size="icon" className="h-9 w-9 shrink-0" aria-label="Send">
+          <Input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Type or pick above…" className="h-10" />
+          <Button type="submit" size="icon" className="h-10 w-10 shrink-0" aria-label="Send">
             <Send className="h-4 w-4" />
           </Button>
-          <Button type="button" variant="ghost" size="sm" className="h-9 shrink-0" onClick={backToMenu}>
+          <Button type="button" variant="ghost" size="sm" className="h-10 shrink-0" onClick={backToMenu}>
             Cancel
           </Button>
         </form>

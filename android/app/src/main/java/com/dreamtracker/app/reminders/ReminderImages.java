@@ -28,11 +28,16 @@ public class ReminderImages {
     }
 
     public static File cacheFile(Context ctx, int id) {
+        return cacheFile(ctx, String.valueOf(id));
+    }
+
+    /** Cache file by name, e.g. "12_alt" for the alternate (S72) image. */
+    public static File cacheFile(Context ctx, String name) {
         File dir = new File(ctx.getCacheDir(), "reminders");
         if (!dir.exists()) {
             dir.mkdirs();
         }
-        return new File(dir, "reminder_" + id + ".img");
+        return new File(dir, "reminder_" + name + ".img");
     }
 
     /** Download url into dest (via a temp file). Blocking — call off the main thread. */

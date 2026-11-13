@@ -1,10 +1,8 @@
 import { useAuth } from "@/hooks/use-auth";
-import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Capacitor } from "@capacitor/core";
-import { CoachChat } from "@/components/coach/coach-chat";
 import {
   LayoutDashboard,
   Star,
@@ -26,6 +24,8 @@ const navigation = [
   { name: "Goals", href: "/goals", icon: Target },
   { name: "Rewards", href: "/rewards", icon: Gift },
   { name: "Habits", href: "/habits", icon: Repeat2 },
+  // S60/S72: the coach chat is its own page, right of Habits (owner).
+  { name: "Coach", href: "/coach", icon: MessageCircle },
 ];
 
 export default function MainLayout({
@@ -35,7 +35,6 @@ export default function MainLayout({
 }) {
   const { user } = useAuth();
   const [location] = useLocation();
-  const [coachOpen, setCoachOpen] = useState(false);
 
   if (!user) return <>{children}</>;
 
@@ -53,20 +52,6 @@ export default function MainLayout({
               {item.name}
             </SidebarLink>
           ))}
-          <button
-            type="button"
-            onClick={() => setCoachOpen((v) => !v)}
-            aria-pressed={coachOpen}
-            className={cn(
-              "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
-              coachOpen
-                ? "bg-sidebar-primary text-sidebar-primary-foreground font-semibold"
-                : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-            )}
-          >
-            <MessageCircle className="h-5 w-5 shrink-0" />
-            <span className="truncate">Coach</span>
-          </button>
         </nav>
 
         <div className="p-3 border-t border-sidebar-border space-y-1">
@@ -144,26 +129,6 @@ export default function MainLayout({
             </Link>
           );
         })}
-        {/* S60: the coach chat lives in the menu, right of Habits (owner). */}
-        <button
-          type="button"
-          onClick={() => setCoachOpen((v) => !v)}
-          aria-pressed={coachOpen}
-          className={cn(
-            "flex flex-1 flex-col items-center justify-center gap-0.5 h-16 text-[11px] font-semibold transition-colors",
-            coachOpen ? "text-primary" : "text-muted-foreground"
-          )}
-        >
-          <span
-            className={cn(
-              "flex h-7 w-12 items-center justify-center rounded-full transition-colors",
-              coachOpen && "bg-gold/40"
-            )}
-          >
-            <MessageCircle className="h-5 w-5 shrink-0" />
-          </span>
-          <span className="truncate">Coach</span>
-        </button>
       </nav>
 
       {/* Main Content */}
@@ -171,8 +136,6 @@ export default function MainLayout({
         <div className="container mx-auto max-w-6xl p-4 pt-20 pb-28 sm:p-6 sm:pt-20 md:pt-8 md:pb-8">{children}</div>
       </main>
 
-      {/* S60: coach chat (guide now, AI coach for Pro + AI later). */}
-      <CoachChat open={coachOpen} onOpenChange={setCoachOpen} />
     </div>
   );
 }

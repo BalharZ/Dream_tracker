@@ -33,6 +33,15 @@ public class HabitReminderReceiver extends BroadcastReceiver {
         final String imagePath = intent.getStringExtra(HabitReminderScheduler.EXTRA_IMAGE_PATH);
         final int hour = intent.getIntExtra(HabitReminderScheduler.EXTRA_HOUR, 8);
         final int minute = intent.getIntExtra(HabitReminderScheduler.EXTRA_MINUTE, 0);
+        final long negFrom = intent.getLongExtra(HabitReminderScheduler.EXTRA_NEG_FROM, 0);
+        final HabitReminderScheduler.Alt alt = negFrom > 0
+            ? new HabitReminderScheduler.Alt(
+                intent.getStringExtra(HabitReminderScheduler.EXTRA_ALT_BODY),
+                intent.getStringExtra(HabitReminderScheduler.EXTRA_ALT_IMAGE),
+                intent.getStringExtra(HabitReminderScheduler.EXTRA_ALT_IMAGE_PATH),
+                negFrom,
+                intent.getBooleanExtra(HabitReminderScheduler.EXTRA_BASE_NEG, false))
+            : null;
 
         // Re-arm the next day's reminder so it repeats daily without the app.
         Calendar next = Calendar.getInstance();
@@ -44,7 +53,15 @@ public class HabitReminderReceiver extends BroadcastReceiver {
             next.add(Calendar.DAY_OF_YEAR, 1);
         }
         HabitReminderScheduler.scheduleExact(
-            context, id, next.getTimeInMillis(), title, body, imageUrl, imagePath, hour, minute);
+            context, id, next.getTimeInMillis(), title, body, imageUrl, imagePath, hour, minute, alt);
+
+        // S72: once the habit is neglected, take turns between the positive
+        // and the negative content, day by day.
+        final boolean useAlt = alt != null && alt.body != null
+            && HabitReminderScheduler.negativeOn(System.currentTimeMillis(), negFrom) != alt.baseIsNegative;
+        final String showBody = useAlt ? alt.body : body;
+        final String showImageUrl = useAlt ? alt.imageUrl : imageUrl;
+        final String showImagePath = useAlt ? alt.imagePath : imagePath;
 
         // Decoding (and the rare fallback download) may block; do it off the main thread.
         final PendingResult pending = goAsync();
@@ -52,7 +69,7 @@ public class HabitReminderReceiver extends BroadcastReceiver {
             @Override
             public void run() {
                 try {
-                    postNotification(context, id, title, body, imageUrl, imagePath);
+                    postNotification(context, id, title, showBody, showImageUrl, showImagePath);
                 } catch (Throwable t) {
                     // Never let a reminder crash the receiver.
                 } finally {
